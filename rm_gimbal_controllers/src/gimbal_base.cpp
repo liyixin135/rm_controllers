@@ -117,16 +117,17 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
 
 void Controller::starting(const ros::Time& /*unused*/)
 {
-  state_ = RATE;
+  state_ = RATE;  // 进入时state是rate
   state_changed_ = true;
 }
 
 void Controller::update(const ros::Time& time, const ros::Duration& period)
 {
-  cmd_gimbal_ = *cmd_rt_buffer_.readFromRT();
-  data_track_ = *track_rt_buffer_.readFromNonRT();
+  cmd_gimbal_ = *cmd_rt_buffer_.readFromRT();       // 读取cmd_gimbal的buffer
+  data_track_ = *track_rt_buffer_.readFromNonRT();  // 读取data_track的buffer
   try
   {
+    // 将pitch和yaw转化为odom坐标系下面
     odom2pitch_ = robot_state_handle_.lookupTransform("odom", ctrl_pitch_.joint_urdf_->child_link_name, time);
     odom2base_ = robot_state_handle_.lookupTransform("odom", ctrl_yaw_.joint_urdf_->parent_link_name, time);
   }
@@ -141,6 +142,7 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
     state_ = cmd_gimbal_.mode;
     state_changed_ = true;
   }
+  // 选择模式
   switch (state_)
   {
     case RATE:
@@ -432,21 +434,29 @@ double Controller::feedForward(const ros::Time& time)
 
 void Controller::updateChassisVel()
 {
+  // 读取时间，化成秒
   double tf_period = odom2base_.header.stamp.toSec() - last_odom2base_.header.stamp.toSec();
+  // xyz位移分别除以短时间等于xyz线速度
   double linear_x = (odom2base_.transform.translation.x - last_odom2base_.transform.translation.x) / tf_period;
   double linear_y = (odom2base_.transform.translation.y - last_odom2base_.transform.translation.y) / tf_period;
   double linear_z = (odom2base_.transform.translation.z - last_odom2base_.transform.translation.z) / tf_period;
   double last_angular_position_x, last_angular_position_y, last_angular_position_z, angular_position_x,
       angular_position_y, angular_position_z;
+  // 将上一时刻和此刻的xzy欧拉角转化为四元素
   quatToRPY(odom2base_.transform.rotation, angular_position_x, angular_position_y, angular_position_z);
   quatToRPY(last_odom2base_.transform.rotation, last_angular_position_x, last_angular_position_y,
             last_angular_position_z);
+  // 将上一时刻与这一时刻夹角的差值除以时间得到xyz角速度
   double angular_x = angles::shortest_angular_distance(last_angular_position_x, angular_position_x) / tf_period;
   double angular_y = angles::shortest_angular_distance(last_angular_position_y, angular_position_y) / tf_period;
   double angular_z = angles::shortest_angular_distance(last_angular_position_z, angular_position_z) / tf_period;
+  // linear_vel数组存储三个线速度
   double linear_vel[3]{ linear_x, linear_y, linear_z };
+  // angular_vel数组存储三个角速度
   double angular_vel[3]{ angular_x, angular_y, angular_z };
+  //
   chassis_vel_->update(linear_vel, angular_vel, tf_period);
+  // 把此时时刻放入上一时刻,以遍再次进入循环记录最新时刻数据
   last_odom2base_ = odom2base_;
 }
 
