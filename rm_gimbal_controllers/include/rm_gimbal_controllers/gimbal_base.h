@@ -74,19 +74,25 @@ public:
   std::shared_ptr<Vector3WithFilter<double>> angular_;
   void update(double linear_vel[3], double angular_vel[3], double period)
   {
+    // 时间少于0，出现错误，没更新时间则底盘速度无法准确更新
     if (period < 0)
       return;
     if (period > 0.1)
     {
+      // 给线速度和角速度的容器清零
       linear_->clear();
       angular_->clear();
     }
+    // 用容器储存线速度和角速度
     linear_->input(linear_vel);
     angular_->input(angular_vel);
+    // debug默认true，update函数走十次才进入一次if
     if (is_debug_ && loop_count_ % 10 == 0)
     {
+      // real_pub_能上锁
       if (real_pub_->trylock())
       {
+        //
         real_pub_->msg_.linear.x = linear_vel[0];
         real_pub_->msg_.linear.y = linear_vel[1];
         real_pub_->msg_.linear.z = linear_vel[2];
@@ -94,10 +100,13 @@ public:
         real_pub_->msg_.angular.y = angular_vel[1];
         real_pub_->msg_.angular.z = angular_vel[2];
 
+        // 把锁打开和publish出去
         real_pub_->unlockAndPublish();
       }
+      // filtered_pub_上锁成功
       if (filtered_pub_->trylock())
       {
+        // 用（过滤的）filtered_pub_读取线速度和角速度
         filtered_pub_->msg_.linear.x = linear_->x();
         filtered_pub_->msg_.linear.y = linear_->y();
         filtered_pub_->msg_.linear.z = linear_->z();
@@ -105,6 +114,7 @@ public:
         filtered_pub_->msg_.angular.y = angular_->y();
         filtered_pub_->msg_.angular.z = angular_->z();
 
+        // 把锁打开和publish出去
         filtered_pub_->unlockAndPublish();
       }
     }
@@ -179,6 +189,7 @@ private:
 
   // Chassis
   double k_chassis_vel_;
+  // 创建智能指针，可用指针指向整个<ChassisVel>的public成员
   std::shared_ptr<ChassisVel> chassis_vel_;
 
   enum
@@ -187,6 +198,7 @@ private:
     TRACK,
     DIRECT
   };
+  // 默认状态为RATE
   int state_ = RATE;
 };
 

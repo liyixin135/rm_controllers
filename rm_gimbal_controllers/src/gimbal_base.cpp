@@ -48,6 +48,7 @@ namespace rm_gimbal_controllers
 {
 bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& root_nh, ros::NodeHandle& controller_nh)
 {
+  // 用XmlRpcValue类探取feedforward命名空间的三个数据
   XmlRpc::XmlRpcValue xml_rpc_value;
   bool enable_feedforward;
   enable_feedforward = controller_nh.getParam("feedforward", xml_rpc_value);
@@ -57,24 +58,32 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
     ROS_ASSERT(xml_rpc_value.hasMember("gravity"));
     ROS_ASSERT(xml_rpc_value.hasMember("enable_gravity_compensation"));
   }
+  // 在确认enable_feedforward拿到速度的前提下，给我们设置的参数赋上参数文件里面的值
   mass_origin_.x = enable_feedforward ? (double)xml_rpc_value["mass_origin"][0] : 0.;
   mass_origin_.z = enable_feedforward ? (double)xml_rpc_value["mass_origin"][2] : 0.;
   gravity_ = enable_feedforward ? (double)xml_rpc_value["gravity"] : 0.;
   enable_gravity_compensation_ = enable_feedforward && (bool)xml_rpc_value["enable_gravity_compensation"];
 
+  // 在句柄controller_nh下，再建立句柄resistance_compensation_nh，拿的参数文件是在yaw/resistance_compensation命令空间下
   ros::NodeHandle resistance_compensation_nh(controller_nh, "yaw/resistance_compensation");
+  // 用resistance_compensation_nh句柄拿参数
   yaw_resistance_ = getParam(resistance_compensation_nh, "resistance", 0.);
   velocity_dead_zone_ = getParam(resistance_compensation_nh, "velocity_dead_zone", 0.);
   effort_dead_zone_ = getParam(resistance_compensation_nh, "effort_dead_zone", 0.);
 
+  // 直接用controller_nh拿参数
   k_chassis_vel_ = getParam(controller_nh, "yaw/k_chassis_vel", 0.);
+  // 在句柄controller_nh下，再建立句柄chassis_vel_nh，拿的参数文件是在chassis_vel命令空间下
   ros::NodeHandle chassis_vel_nh(controller_nh, "chassis_vel");
   chassis_vel_ = std::make_shared<ChassisVel>(chassis_vel_nh);
+  // 在句柄controller_nh下，再建立句柄nh_bullet_solver，拿的参数文件是在bullet_solver命令空间下
   ros::NodeHandle nh_bullet_solver = ros::NodeHandle(controller_nh, "bullet_solver");
   bullet_solver_ = std::make_shared<BulletSolver>(nh_bullet_solver);
 
+  // 在句柄controller_nh下，再建立句柄nh_yaw和nh_pitch，拿的参数文件是在yaw和pitch命令空间下
   ros::NodeHandle nh_yaw = ros::NodeHandle(controller_nh, "yaw");
   ros::NodeHandle nh_pitch = ros::NodeHandle(controller_nh, "pitch");
+  // 用nh_yaw和nh_pitch拿参数
   yaw_k_v_ = getParam(nh_yaw, "k_v", 0.);
   pitch_k_v_ = getParam(nh_pitch, "k_v", 0.);
   hardware_interface::EffortJointInterface* effort_joint_interface =
@@ -82,10 +91,12 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
   if (!ctrl_yaw_.init(effort_joint_interface, nh_yaw) || !ctrl_pitch_.init(effort_joint_interface, nh_pitch))
     return false;
   robot_state_handle_ = robot_hw->get<rm_control::RobotStateInterface>()->getHandle("robot_state");
+  // 从rm_config看默认有imu_name
   if (!controller_nh.hasParam("imu_name"))
     has_imu_ = false;
   if (has_imu_)
   {
+    // 给imu_name_起名gimbal_imu
     imu_name_ = getParam(controller_nh, "imu_name", static_cast<std::string>("gimbal_imu"));
     hardware_interface::ImuSensorInterface* imu_sensor_interface =
         robot_hw->get<hardware_interface::ImuSensorInterface>();
@@ -117,17 +128,20 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
 
 void Controller::starting(const ros::Time& /*unused*/)
 {
-  state_ = RATE;  // 进入时state是rate
+  // 进入时state是RATE
+  state_ = RATE;
   state_changed_ = true;
 }
 
 void Controller::update(const ros::Time& time, const ros::Duration& period)
 {
-  cmd_gimbal_ = *cmd_rt_buffer_.readFromRT();       // 读取cmd_gimbal的buffer
-  data_track_ = *track_rt_buffer_.readFromNonRT();  // 读取data_track的buffer
+  // 用cmd_gimbal_读取<rm_msgs::GimbalCmd> cmd_rt_buffer_的buffer
+  cmd_gimbal_ = *cmd_rt_buffer_.readFromRT();
+  // 用data_track_读取<rm_msgs::TrackData> track_rt_buffer_的buffer
+  data_track_ = *track_rt_buffer_.readFromNonRT();
   try
   {
-    // 将pitch和yaw转化为odom坐标系下面
+    // 将pitch和yaw转化为odom坐标系下面,yaw和base_link是同种姿态，进而转化为base_link
     odom2pitch_ = robot_state_handle_.lookupTransform("odom", ctrl_pitch_.joint_urdf_->child_link_name, time);
     odom2base_ = robot_state_handle_.lookupTransform("odom", ctrl_yaw_.joint_urdf_->parent_link_name, time);
   }
@@ -136,7 +150,9 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
     ROS_WARN("%s", ex.what());
     return;
   }
+  // 更新底盘速度
   updateChassisVel();
+  // 保证有模式可以进入
   if (state_ != cmd_gimbal_.mode)
   {
     state_ = cmd_gimbal_.mode;
@@ -456,7 +472,7 @@ void Controller::updateChassisVel()
   double angular_vel[3]{ angular_x, angular_y, angular_z };
   //
   chassis_vel_->update(linear_vel, angular_vel, tf_period);
-  // 把此时时刻放入上一时刻,以遍再次进入循环记录最新时刻数据
+  // 把现在时刻放入上一时刻,以遍再次进入循环记录最新时刻数据
   last_odom2base_ = odom2base_;
 }
 
