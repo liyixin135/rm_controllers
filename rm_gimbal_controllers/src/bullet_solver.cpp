@@ -44,6 +44,7 @@ namespace rm_gimbal_controllers
 {
 BulletSolver::BulletSolver(ros::NodeHandle& controller_nh)
 {
+  // 整个config_都是在yaml参数中拿数据
   config_ = { .resistance_coff_qd_10 = getParam(controller_nh, "resistance_coff_qd_10", 0.),
               .resistance_coff_qd_15 = getParam(controller_nh, "resistance_coff_qd_15", 0.),
               .resistance_coff_qd_16 = getParam(controller_nh, "resistance_coff_qd_16", 0.),
@@ -54,8 +55,10 @@ BulletSolver::BulletSolver(ros::NodeHandle& controller_nh)
               .dt = getParam(controller_nh, "dt", 0.),
               .timeout = getParam(controller_nh, "timeout", 0.) };
   max_track_target_vel_ = getParam(controller_nh, "max_track_target_vel", 5.0);
+  // 把数据放在缓存区
   config_rt_buffer_.initRT(config_);
 
+  // visualization_msgs::Marker marker_desire_
   marker_desire_.header.frame_id = "odom";
   marker_desire_.ns = "model";
   marker_desire_.action = visualization_msgs::Marker::ADD;
