@@ -58,33 +58,43 @@ BulletSolver::BulletSolver(ros::NodeHandle& controller_nh)
   // 把数据放在缓存区
   config_rt_buffer_.initRT(config_);
 
-  // visualization_msgs::Marker marker_desire_
-  marker_desire_.header.frame_id = "odom";
-  marker_desire_.ns = "model";
-  marker_desire_.action = visualization_msgs::Marker::ADD;
-  marker_desire_.type = visualization_msgs::Marker::POINTS;
+  // visualization_msgs::Marker marker_desire_ 调用库内结构体，我们起名为marker_desire_
+  marker_desire_.header.frame_id = "odom";                   // 坐标系
+  marker_desire_.ns = "model";                               // 命名空间
+  marker_desire_.action = visualization_msgs::Marker::ADD;   // 操作，是添加还是修改还是删除
+  marker_desire_.type = visualization_msgs::Marker::POINTS;  // 类型
+  // 靶子大小为0.02*0.02
   marker_desire_.scale.x = 0.02;
   marker_desire_.scale.y = 0.02;
+  // marker_desire_靶子颜色为红色
   marker_desire_.color.r = 1.0;
   marker_desire_.color.g = 0.0;
   marker_desire_.color.b = 0.0;
   marker_desire_.color.a = 1.0;
 
+  // visualization_msgs::Marker marker_real_，再次调用库内结构体，清明为marker_desire_
   marker_real_ = marker_desire_;
   marker_real_.color.r = 0.0;
+  // marker_desire_ 靶子颜色为绿色
   marker_real_.color.g = 1.0;
 
+  // 动态调参
   d_srv_ = new dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>(controller_nh);
   dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>::CallbackType cb =
       [this](auto&& PH1, auto&& PH2) { reconfigCB(PH1, PH2); };
   d_srv_->setCallback(cb);
 
+  // std::shared_ptr<realtime_tools::RealtimePublisher<visualization_msgs::Marker>> path_desire_pub_
+  // path_desire_pub_消息类型为visualization_msgs::Marker
+  // path_desire_pub发布在“model_desire”下
   path_desire_pub_.reset(
       new realtime_tools::RealtimePublisher<visualization_msgs::Marker>(controller_nh, "model_desire", 10));
+  // path_real_pub_发布在“model_real”下
   path_real_pub_.reset(
       new realtime_tools::RealtimePublisher<visualization_msgs::Marker>(controller_nh, "model_real", 10));
 }
 
+// 整个BulletSolver::getResistanceCoefficient在对应不同的子弹弹速在给resistance_coff的值
 double BulletSolver::getResistanceCoefficient(double bullet_speed) const
 {
   // bullet_speed have 5 value:10,15,16,18,30
@@ -102,21 +112,35 @@ double BulletSolver::getResistanceCoefficient(double bullet_speed) const
   return resistance_coff;
 }
 
+// 标志位solve_success是BulletSolver::solve函数的return值
+// solve(pos目标位置, vel目标速度, bullet_speed子弹速度, bullet_speed装甲板yaw值,
+//        v_yaw装甲板旋转的角速度,r1半径1, r2半径2, dz装甲板距离车中心的距离, armors_num装甲板数量);
 bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double bullet_speed, double yaw,
                          double v_yaw, double r1, double r2, double dz, int armors_num)
 {
+  // config_拿了一堆参数
   config_ = *config_rt_buffer_.readFromRT();
   bullet_speed_ = bullet_speed;
+  // 对应弹速拿resistance_coff_值
   resistance_coff_ = getResistanceCoefficient(bullet_speed_) != 0 ? getResistanceCoefficient(bullet_speed_) : 0.001;
 
+  // temp_z是dz，即装甲板距离车中心的距离
   double temp_z = pos.z;
+  // target_rho等于根号下x平方+y平方，即不考虑z轴，把平面压缩为xoy平面
+  // target_rho是我方和敌方的距离
   double target_rho = std::sqrt(std::pow(pos.x, 2) + std::pow(pos.y, 2));
+  // 输出yaw为y/x的反正切
+  // output_yaw_为现在我方头yaw需要偏向装甲板的角度
   output_yaw_ = std::atan2(pos.y, pos.x);
+  // output_pitch_为现在我方头pitch需要偏向装甲板的角度
   output_pitch_ = std::atan2(temp_z, std::sqrt(std::pow(pos.x, 2) + std::pow(pos.y, 2)));
+  // 根据我看不懂的公式得出粗略的飞行时间rough_fly_time
   double rough_fly_time =
       (-std::log(1 - target_rho * resistance_coff_ / (bullet_speed_ * std::cos(output_pitch_)))) / resistance_coff_;
   selected_armor_ = 0;
+  // 用r取半径1
   double r = r1;
+  // z
   double z = pos.z;
   track_target_ = std::abs(v_yaw) < max_track_target_vel_;
   double switch_armor_angle = track_target_ ?
