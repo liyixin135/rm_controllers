@@ -241,37 +241,47 @@ void Controller::rate(const ros::Time& time, const ros::Duration& period)
 
 void Controller::track(const ros::Time& time)
 {
+  // 打印进去track
   if (state_changed_)
   {  // on enter
     state_changed_ = false;
     ROS_INFO("[Gimbal] Enter TRACK");
   }
   double roll_real, pitch_real, yaw_real;
+  // 把位置转换为三个欧拉角
   quatToRPY(odom2pitch_.transform.rotation, roll_real, pitch_real, yaw_real);
+  // 定义了yaw_compute
   double yaw_compute = yaw_real;
+  // pitch方向上要给负值
   double pitch_compute = -pitch_real;
+  // 用target_pos和target_vel从视觉读取目标中心位置和目标中心速度
   geometry_msgs::Point target_pos = data_track_.position;
   geometry_msgs::Vector3 target_vel = data_track_.velocity;
   try
   {
-    if (!data_track_.header.frame_id.empty())
+    if (!data_track_.header.frame_id.empty())  // 如果视觉那边坐标系不是空的，就进去
     {
+      // 定义好要交换的坐标系
       geometry_msgs::TransformStamped transform =
           robot_state_handle_.lookupTransform("odom", data_track_.header.frame_id, data_track_.header.stamp);
+      // 用官方接口把position和velocity转换到odom坐标系
       tf2::doTransform(target_pos, target_pos, transform);
       tf2::doTransform(target_vel, target_vel, transform);
     }
   }
-  catch (tf2::TransformException& ex)
+  catch (tf2::TransformException& ex)  // 视觉坐标系是空的就报错
   {
     ROS_WARN("%s", ex.what());
   }
+  // 用target_pos和target_vel转变为相对yaw和pitch的位置和速度
   target_pos.x -= odom2pitch_.transform.translation.x;
   target_pos.y -= odom2pitch_.transform.translation.y;
   target_pos.z -= odom2pitch_.transform.translation.z;
   target_vel.x -= chassis_vel_->linear_->x();
   target_vel.y -= chassis_vel_->linear_->y();
   target_vel.z -= chassis_vel_->linear_->z();
+  // 调用solve函数，用solve_success作为该函数的标志位
+  // 传进去的在odom坐标系下的target_pos和target_vel
   bool solve_success =
       bullet_solver_->solve(target_pos, target_vel, cmd_gimbal_.bullet_speed, data_track_.yaw, data_track_.v_yaw,
                             data_track_.radius_1, data_track_.radius_2, data_track_.dz, data_track_.armors_num);
