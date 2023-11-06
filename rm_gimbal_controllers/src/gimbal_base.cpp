@@ -241,7 +241,7 @@ void Controller::rate(const ros::Time& time, const ros::Duration& period)
 
 void Controller::track(const ros::Time& time)
 {
-  // 打印进去track
+  // 打印[Gimbal] Enter TRACK
   if (state_changed_)
   {  // on enter
     state_changed_ = false;

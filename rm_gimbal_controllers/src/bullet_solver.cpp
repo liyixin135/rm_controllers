@@ -114,7 +114,7 @@ double BulletSolver::getResistanceCoefficient(double bullet_speed) const
 
 // 标志位solve_success拿的是BulletSolver::solve函数的return值
 // solve(pos相对于我方机器人的目标中心位置, vel相对于我方机器人的目标速度, bullet_speed子弹速度, 装甲板的朝向yaw值相对我方机器人,
-//        v_yaw装甲板旋转的角速度,r1半径1, r2半径2, dz装甲板距离车中心的距离, armors_num装甲板数量);
+//        v_yaw装甲板旋转的角速度,r1半径1, r2半径2, dz相邻装甲板的高度差, armors_num装甲板数量);
 bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double bullet_speed, double yaw,
                          double v_yaw, double r1, double r2, double dz, int armors_num)
 {
@@ -130,9 +130,9 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
   // target_rho是xoy平面我方和敌方车中心的距离
   double target_rho = std::sqrt(std::pow(pos.x, 2) + std::pow(pos.y, 2));
   // 输出yaw为y/x的反正切
-  // output_yaw_为现在我方头yaw需要偏向装甲板的角度
+  // output_yaw_为现在我方头yaw需要偏向敌方车的角度
   output_yaw_ = std::atan2(pos.y, pos.x);
-  // output_pitch_为现在我方头pitch需要偏向装甲板的角度
+  // output_pitch_为现在我方头pitch需要偏向敌方车的角度
   output_pitch_ = std::atan2(temp_z, std::sqrt(std::pow(pos.x, 2) + std::pow(pos.y, 2)));
   // 根据我看不懂的公式得出粗略的飞行时间rough_fly_time
   double rough_fly_time =
@@ -146,24 +146,25 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
   // 如果装甲板旋转速度大于5，track_target给0
   // 如果装甲板旋转速度小于5，track_target给1
   track_target_ = std::abs(v_yaw) < max_track_target_vel_;
-  // 装甲板旋转速度小于5的情况下，switch_armor_angle等于什么什么
   // 装甲板旋转速度大于5的情况下，switch_armor_angle等于pai/12
+  // 装甲板旋转速度小于5的情况下，switch_armor_angle等于什么什么
   double switch_armor_angle = track_target_ ?
                                   acos(r / target_rho) - M_PI / 12 +
                                       (-acos(r / target_rho) + M_PI / 6) * std::abs(v_yaw) / max_track_target_vel_ :
                                   M_PI / 12;
-  // 但从下面可以看出switch_armor_angle是来补偿计算角度的误差的
-  // 如果计算出来最后的误差不是等于0的话
-  // 情况一，装甲板的朝向yaw加上本身在旋转的yaw角度大于偏转角，敌方装甲板转过我们的枪管了，我们枪管要跟它同向去追
-  // 情况二，装甲板的朝向yaw加上本身在旋转的yaw角度大于偏转角，敌方装甲板还转不到我们枪管，我们枪管要跟它反向碰面
+  // switch_armor_angle是计算车中心与装甲板相对于我方机器人的角度
+  // 情况一，装甲板预期位置大于我们所能达到位置，
+  // 情况二，装甲板预期位置小于我们所能达到位置，
   if ((((yaw + v_yaw * rough_fly_time) > output_yaw_ + switch_armor_angle) && v_yaw > 0.) ||
       (((yaw + v_yaw * rough_fly_time) < output_yaw_ - switch_armor_angle) && v_yaw < 0.))
   {
     // 装甲板角速度正向给-1，反向给1
+    // 这里本质是需要换下一块或者上一块板子
     selected_armor_ = v_yaw > 0. ? -1 : 1;
     // 装甲板数目是4，r取r2，前面已经算完了r1，后面开始算r2
+    // 如果不需要板子，r2根本不需要出现
     r = armors_num == 4 ? r2 : r1;
-    // 如果装甲板数目是4，z等于中心位置加上偏差dz，即为装甲板真正位置
+    // 如果装甲板数目是4，z等于中心位置加上偏差dz，即为下一块或者上一块装甲板的实际z位置
     // 如果装甲板数目不是4，那么z的位置就是目标位置z
     z = armors_num == 4 ? pos.z + dz : pos.z;
   }
@@ -172,7 +173,6 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
   // 本质为了算目标位置的xy
   if (track_target_)  // 装甲板速度小于5进if
   {
-    // 4块装甲板的r2在起作用
     // target_pos_第一次出现
     target_pos_.x = pos.x - r * cos(yaw + selected_armor_ * 2 * M_PI / armors_num);
     target_pos_.y = pos.y - r * sin(yaw + selected_armor_ * 2 * M_PI / armors_num);
@@ -182,7 +182,8 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
     target_pos_.x = pos.x - r * cos(atan2(pos.y, pos.x));
     target_pos_.y = pos.y - r * sin(atan2(pos.y, pos.x));
   }
-  // 计算出来的z直接为目标位置的z
+  // 情况具体为如果为4块装甲板的兵种，并且这块装甲板它打不到了，只能重新计算z
+  // target_pos_.z在这里完成了真正的目标位置赋值
   target_pos_.z = z;
   // 第一次直接进循环，error默认
   while (error >= 0.001)
