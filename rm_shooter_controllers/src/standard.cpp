@@ -44,6 +44,7 @@ namespace rm_shooter_controllers
 {
 bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& root_nh, ros::NodeHandle& controller_nh)
 {
+  //给config_定义
   config_ = { .block_effort = getParam(controller_nh, "block_effort", 0.),
               .block_speed = getParam(controller_nh, "block_speed", 0.),
               .block_duration = getParam(controller_nh, "block_duration", 0.),
@@ -53,38 +54,48 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
               .forward_push_threshold = getParam(controller_nh, "forward_push_threshold", 0.1),
               .exit_push_threshold = getParam(controller_nh, "exit_push_threshold", 0.1),
               .extra_wheel_speed = getParam(controller_nh, "extra_wheel_speed", 0.) };
+  //缓存初始化config_
   config_rt_buffer.initRT(config_);
+  //拿参拿参
   push_per_rotation_ = getParam(controller_nh, "push_per_rotation", 0);
   push_wheel_speed_threshold_ = getParam(controller_nh, "push_wheel_speed_threshold", 0.);
 
+  //命令的订阅者，就是把话题拿出来实现
   cmd_subscriber_ = controller_nh.subscribe<rm_msgs::ShootCmd>("command", 1, &Controller::commandCB, this);
+  //发布shoot状态的发布者
   shoot_state_pub_.reset(new realtime_tools::RealtimePublisher<rm_msgs::ShootState>(controller_nh, "state", 10));
-  // Init dynamic reconfigure
+  // Init dynamic reconfigure，动态调参用的
   d_srv_ = new dynamic_reconfigure::Server<rm_shooter_controllers::ShooterConfig>(controller_nh);
   dynamic_reconfigure::Server<rm_shooter_controllers::ShooterConfig>::CallbackType cb = [this](auto&& PH1, auto&& PH2) {
     reconfigCB(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2));
   };
   d_srv_->setCallback(cb);
 
+  //给左右摩擦轮和拨盘定义句柄
   ros::NodeHandle nh_friction_l = ros::NodeHandle(controller_nh, "friction_left");
   ros::NodeHandle nh_friction_r = ros::NodeHandle(controller_nh, "friction_right");
   ros::NodeHandle nh_trigger = ros::NodeHandle(controller_nh, "trigger");
+  //effort_joint_interface_可以命令基于力距控制的关节
   effort_joint_interface_ = robot_hw->get<hardware_interface::EffortJointInterface>();
   return ctrl_friction_l_.init(effort_joint_interface_, nh_friction_l) &&
          ctrl_friction_r_.init(effort_joint_interface_, nh_friction_r) &&
          ctrl_trigger_.init(effort_joint_interface_, nh_trigger);
 }
 
+//进入一次starting
 void Controller::starting(const ros::Time& /*time*/)
 {
   state_ = STOP;
   state_changed_ = true;
 }
 
+//starting之后来到update
 void Controller::update(const ros::Time& time, const ros::Duration& period)
 {
+  //从缓存区拿命令和参数
   cmd_ = *cmd_rt_buffer_.readFromRT();
   config_ = *config_rt_buffer.readFromRT();
+
   if (state_ != cmd_.mode)
   {
     if (state_ != BLOCK)
@@ -100,6 +111,7 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
 
   if (state_ != STOP)
     setSpeed(cmd_);
+  //选择模式进入
   switch (state_)
   {
     case READY:
@@ -126,6 +138,7 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
   ctrl_trigger_.update(time, period);
 }
 
+//不用看，就是停住，注意一下，trigger是定在原来的位置
 void Controller::stop(const ros::Time& time, const ros::Duration& period)
 {
   if (state_changed_)
@@ -139,8 +152,10 @@ void Controller::stop(const ros::Time& time, const ros::Duration& period)
   }
 }
 
+//ready去normalize去函数看
 void Controller::ready(const ros::Duration& period)
 {
+  //打印信息
   if (state_changed_)
   {  // on enter
     state_changed_ = false;
@@ -152,6 +167,7 @@ void Controller::ready(const ros::Duration& period)
 
 void Controller::push(const ros::Time& time, const ros::Duration& period)
 {
+  //打印信息
   if (state_changed_)
   {  // on enter
     state_changed_ = false;
@@ -225,10 +241,13 @@ void Controller::setSpeed(const rm_msgs::ShootCmd& cmd)
 
 void Controller::normalize()
 {
+  //拨盘push角度等于2pai除以洞数
   double push_angle = 2. * M_PI / static_cast<double>(push_per_rotation_);
+  //offset生效的地方
   ctrl_trigger_.setCommand(push_angle * std::floor((ctrl_trigger_.joint_.getPosition() + 0.01) / push_angle));
 }
 
+//为了动态调参写的，重新加载参数
 void Controller::reconfigCB(rm_shooter_controllers::ShooterConfig& config, uint32_t /*level*/)
 {
   ROS_INFO("[Shooter] Dynamic params change");
