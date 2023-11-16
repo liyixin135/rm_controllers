@@ -96,16 +96,17 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
   cmd_ = *cmd_rt_buffer_.readFromRT();
   config_ = *config_rt_buffer.readFromRT();
 
+  //其实就是在换模式，当模式和命令不一样了就可以进第一道if
   if (state_ != cmd_.mode)
   {
-    if (state_ != BLOCK)
+    if (state_ != BLOCK)//不是block堵塞了就可以进第二道if
       if ((state_ != PUSH || cmd_.mode != READY) ||
           (cmd_.mode == READY &&
            std::fmod(std::abs(ctrl_trigger_.command_struct_.position_ - ctrl_trigger_.getPosition()), 2. * M_PI) <
-               config_.exit_push_threshold))
+               config_.exit_push_threshold))//情况一，如果是stop或者
       {
-        state_ = cmd_.mode;
-        state_changed_ = true;
+        state_ = cmd_.mode;//state变为命令状态
+        state_changed_ = true;//改标志位，已成功改变状态
       }
   }
 
@@ -127,12 +128,14 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
       block(time, period);
       break;
   }
+  //唯一访问权限
   if (shoot_state_pub_->trylock())
   {
     shoot_state_pub_->msg_.stamp = time;
     shoot_state_pub_->msg_.state = state_;
     shoot_state_pub_->unlockAndPublish();
   }
+  //向关节发布命令
   ctrl_friction_l_.update(time, period);
   ctrl_friction_r_.update(time, period);
   ctrl_trigger_.update(time, period);
@@ -173,6 +176,10 @@ void Controller::push(const ros::Time& time, const ros::Duration& period)
     state_changed_ = false;
     ROS_INFO("[Shooter] Enter PUSH");
   }
+  //满足两个条件，条件二，距离上次发射的时间过去了一个周期
+  //必须满足的条件是时间达到一个周期进一次if，接下来分为两种情况
+  // 情况一，摩擦轮速度为0
+  //情况二，
   if ((cmd_.wheel_speed == 0. ||
        (ctrl_friction_l_.joint_.getVelocity() >= push_wheel_speed_threshold_ * ctrl_friction_l_.command_ &&
         ctrl_friction_l_.joint_.getVelocity() > M_PI &&
@@ -209,7 +216,7 @@ void Controller::push(const ros::Time& time, const ros::Duration& period)
       maybe_block_ = false;
   }
   else
-    ROS_DEBUG("[Shooter] Wait for friction wheel");
+    ROS_DEBUG("[Shooter] Wait for friction wheel");//摩擦轮没转起来，shooter控制器在等摩擦轮
 }
 
 void Controller::block(const ros::Time& time, const ros::Duration& period)
@@ -233,6 +240,7 @@ void Controller::block(const ros::Time& time, const ros::Duration& period)
   }
 }
 
+//命令摩擦轮转，后面那个是在manual里面调节速度的，按一下+或者-5
 void Controller::setSpeed(const rm_msgs::ShootCmd& cmd)
 {
   ctrl_friction_l_.setCommand(cmd_.wheel_speed + config_.extra_wheel_speed);
