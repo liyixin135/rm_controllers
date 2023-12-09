@@ -128,7 +128,7 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
       block(time, period);
       break;
   }
-  //唯一访问权限
+  // 如果能获得锁，就可以发布时间，状态
   if (shoot_state_pub_->trylock())
   {
     shoot_state_pub_->msg_.stamp = time;
@@ -141,7 +141,7 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
   ctrl_trigger_.update(time, period);
 }
 
-//不用看，就是停住，注意一下，trigger是定在原来的位置
+// 就是停住
 void Controller::stop(const ros::Time& time, const ros::Duration& period)
 {
   if (state_changed_)
@@ -151,7 +151,7 @@ void Controller::stop(const ros::Time& time, const ros::Duration& period)
 
     ctrl_friction_l_.setCommand(0.);
     ctrl_friction_r_.setCommand(0.);
-    ctrl_trigger_.setCommand(ctrl_trigger_.joint_.getPosition());
+    ctrl_trigger_.setCommand(ctrl_trigger_.joint_.getPosition());  // 是拿拨盘当前位置
   }
 }
 
@@ -176,10 +176,7 @@ void Controller::push(const ros::Time& time, const ros::Duration& period)
     state_changed_ = false;
     ROS_INFO("[Shooter] Enter PUSH");
   }
-  //满足两个条件，条件二，距离上次发射的时间过去了一个周期
-  //必须满足的条件是时间达到一个周期进一次if，接下来分为两种情况
-  // 情况一，摩擦轮速度为0
-  //情况二，
+  // 对于摩擦轮，要么速度为0,要么转起来了，速度绝对值大于命令的百分之90,且大于2pai。然后再要求时间达到所设的赫兹就可以进去这个if
   if ((cmd_.wheel_speed == 0. ||
        (ctrl_friction_l_.joint_.getVelocity() >= push_wheel_speed_threshold_ * ctrl_friction_l_.command_ &&
         ctrl_friction_l_.joint_.getVelocity() > M_PI &&
@@ -188,35 +185,36 @@ void Controller::push(const ros::Time& time, const ros::Duration& period)
       (time - last_shoot_time_).toSec() >= 1. / cmd_.hz)
   {  // Time to shoot!!!
     if (std::fmod(std::abs(ctrl_trigger_.command_struct_.position_ - ctrl_trigger_.getPosition()), 2. * M_PI) <
-        config_.forward_push_threshold)
+        config_.forward_push_threshold)  // 防止命令的位置距离现有位置推出去太多
     {
+      // 命令拨盘拨一个弹位
       ctrl_trigger_.setCommand(ctrl_trigger_.command_struct_.position_ -
                                2. * M_PI / static_cast<double>(push_per_rotation_));
-      last_shoot_time_ = time;
+      last_shoot_time_ = time;  // 更新时间
     }
-    // Check block
+    // Check block，情况一，力和速度比设定的block要大，情况二，上次发射的时间已经长于设定的频率并且速度比设定的block要大
     if ((ctrl_trigger_.joint_.getEffort() < -config_.block_effort &&
          std::abs(ctrl_trigger_.joint_.getVelocity()) < config_.block_speed) ||
         ((time - last_shoot_time_).toSec() > 1 / cmd_.hz &&
          std::abs(ctrl_trigger_.joint_.getVelocity()) < config_.block_speed))
     {
-      if (!maybe_block_)
+      if (!maybe_block_)  // 进来后maybe_block_就变成true了
       {
-        block_time_ = time;
+        block_time_ = time;  // 记录block_time_时间
         maybe_block_ = true;
       }
-      if ((time - block_time_).toSec() >= config_.block_duration)
+      if ((time - block_time_).toSec() >= config_.block_duration)  // 如果block的时间长于设定的时间
       {
-        state_ = BLOCK;
+        state_ = BLOCK;  // 状态变为block
         state_changed_ = true;
-        ROS_INFO("[Shooter] Exit PUSH");
+        ROS_INFO("[Shooter] Exit PUSH");  // 打印退出push
       }
     }
-    else
+    else  // 满足以上if情况，maybe_block_就是true
       maybe_block_ = false;
   }
   else
-    ROS_DEBUG("[Shooter] Wait for friction wheel");//摩擦轮没转起来，shooter控制器在等摩擦轮
+    ROS_DEBUG("[Shooter] Wait for friction wheel");  // 给摩擦轮速度命令了，但是摩擦轮没转起来，shooter控制器在等摩擦轮
 }
 
 void Controller::block(const ros::Time& time, const ros::Duration& period)
