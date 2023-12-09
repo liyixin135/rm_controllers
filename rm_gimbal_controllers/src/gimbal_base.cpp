@@ -141,7 +141,7 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
   data_track_ = *track_rt_buffer_.readFromNonRT();
   try
   {
-    // 将pitch和yaw转化为odom坐标系下面,yaw和base_link是同种姿态，进而转化为base_link
+    // 将pitch和base_link转化为odom坐标系下面
     odom2pitch_ = robot_state_handle_.lookupTransform("odom", ctrl_pitch_.joint_urdf_->child_link_name, time);
     odom2base_ = robot_state_handle_.lookupTransform("odom", ctrl_yaw_.joint_urdf_->parent_link_name, time);
   }
@@ -152,7 +152,7 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
   }
   // 更新底盘速度
   updateChassisVel();
-  // 保证有模式可以进入
+  // 有新命令时进入这个模式
   if (state_ != cmd_gimbal_.mode)
   {
     state_ = cmd_gimbal_.mode;
@@ -358,11 +358,14 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   geometry_msgs::Vector3 gyro, angular_vel_pitch, angular_vel_yaw;
   if (has_imu_)
   {
+    // 获取三轴上的速度，存放到一个geometry_msgs::vector3（三维向量）类型的变量(gyro)中
     gyro.x = imu_sensor_handle_.getAngularVelocity()[0];
     gyro.y = imu_sensor_handle_.getAngularVelocity()[1];
     gyro.z = imu_sensor_handle_.getAngularVelocity()[2];
     try
     {
+      // t_in是转换的输入，&是转换的输出，transform是转换关系
+      // 这里通过imu到pitch/yaw的转换关系，把imu坐标下的三个轴的速度转换成pitch/yaw坐标下的三轴的速度，然后得到整个云台的速度
       tf2::doTransform(gyro, angular_vel_pitch,
                        robot_state_handle_.lookupTransform(ctrl_pitch_.joint_urdf_->child_link_name,
                                                            imu_sensor_handle_.getFrameId(), time));
@@ -378,6 +381,9 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   }
   else
   {
+    /*1.没有imu时，直接通过编码器来获取关节速度，精度会比imu低
+      2.jointPositionController.joint是hardware_interface::JointHandle类型的变量；
+      是用于读取和命令单个关节的句柄，可以通过这个句柄获取关节速度、位置等信息，也可以发送力矩指令*/
     angular_vel_yaw.z = ctrl_yaw_.joint_.getVelocity();
     angular_vel_pitch.y = ctrl_pitch_.joint_.getVelocity();
   }
@@ -390,11 +396,13 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   double yaw_vel_des = 0., pitch_vel_des = 0.;
   if (state_ == RATE)
   {
+    // rate模式下，期望速度即为指令中的速度
     yaw_vel_des = cmd_gimbal_.rate_yaw;
     pitch_vel_des = cmd_gimbal_.rate_pitch;
   }
   else if (state_ == TRACK)
   {
+    // 自瞄时，期望速度通过下面的计算获得，getSelectedArmorPosAndVel在弹道解算里面
     geometry_msgs::Point target_pos;
     geometry_msgs::Vector3 target_vel;
     bullet_solver_->getSelectedArmorPosAndVel(target_pos, target_vel, data_track_.position, data_track_.velocity,
@@ -404,14 +412,20 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
 
     try
     {
+      // 定义了是从自瞄坐标系到base_link坐标系的转换
       geometry_msgs::TransformStamped transform = robot_state_handle_.lookupTransform(
           ctrl_yaw_.joint_urdf_->parent_link_name, data_track_.header.frame_id, data_track_.header.stamp);
+      // 转换到base_link坐标系下，得到base_link坐标系下的target_pos和target_vel
       tf2::doTransform(target_pos, target_pos, transform);
       tf2::doTransform(target_vel, target_vel, transform);
+      // msg类型转换为tf类型
       tf2::fromMsg(target_pos, target_pos_tf);
       tf2::fromMsg(target_vel, target_vel_tf);
 
+      // tf2::Vector3.cross()这个函数会返回该向量与另一个向量（cross函数的参数）之间的叉乘
+      // z.()会返回这个向量的z的值，因为yaw只会绕着z轴转，计算方法不是很想看
       yaw_vel_des = target_pos_tf.cross(target_vel_tf).z() / std::pow((target_pos_tf.length()), 2);
+      // 定义了是从自瞄坐标系到yaw坐标系的转换，计算方法和yaw的差不多
       transform = robot_state_handle_.lookupTransform(ctrl_pitch_.joint_urdf_->parent_link_name,
                                                       data_track_.header.frame_id, data_track_.header.stamp);
       tf2::doTransform(target_pos, target_pos, transform);
@@ -426,20 +440,27 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
     }
   }
 
+  // 让yaw和pitch动
   ctrl_yaw_.setCommand(yaw_des, yaw_vel_des + ctrl_yaw_.joint_.getVelocity() - angular_vel_yaw.z);
   ctrl_pitch_.setCommand(pitch_des, pitch_vel_des + ctrl_pitch_.joint_.getVelocity() - angular_vel_pitch.y);
+  // yaw和picth更新数据
   ctrl_yaw_.update(time, period);
   ctrl_pitch_.update(time, period);
   double resistance_compensation = 0.;
+  // 有速度就能进，一个速度一个力距
   if (std::abs(ctrl_yaw_.joint_.getVelocity()) > velocity_dead_zone_)
-    resistance_compensation = (ctrl_yaw_.joint_.getVelocity() > 0 ? 1 : -1) * yaw_resistance_;
+    resistance_compensation = (ctrl_yaw_.joint_.getVelocity() > 0 ? 1 : -1) *
+                              yaw_resistance_;  // resistance_compensation是考虑阻力增幅后的速度
   else if (std::abs(ctrl_yaw_.joint_.getCommand()) > effort_dead_zone_)
     resistance_compensation = (ctrl_yaw_.joint_.getCommand() > 0 ? 1 : -1) * yaw_resistance_;
+  // 给yaw设置速度指令，速度等于命令减掉底盘本身有的速度，再加上阻力增幅
   ctrl_yaw_.joint_.setCommand(ctrl_yaw_.joint_.getCommand() - k_chassis_vel_ * chassis_vel_->angular_->z() +
                               yaw_k_v_ * yaw_vel_des + resistance_compensation);
+  // 给pitch设置速度指令，速度等于命令速度加上重力补偿加上pitch本身有的速度
   ctrl_pitch_.joint_.setCommand(ctrl_pitch_.joint_.getCommand() + feedForward(time) + pitch_k_v_ * pitch_vel_des);
 }
 
+// feedforward其实就是pitch受到的重力，通过向量叉乘计算得到
 double Controller::feedForward(const ros::Time& time)
 {
   Eigen::Vector3d gravity(0, 0, -gravity_);
