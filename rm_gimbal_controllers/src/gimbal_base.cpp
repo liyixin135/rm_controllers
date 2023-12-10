@@ -402,7 +402,7 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   }
   else if (state_ == TRACK)
   {
-    // 自瞄时，期望速度通过下面的计算获得，getSelectedArmorPosAndVel在弹道解算里面
+    // track模式时，期望速度通过下面的计算获得，getSelectedArmorPosAndVel在弹道解算里面
     geometry_msgs::Point target_pos;
     geometry_msgs::Vector3 target_vel;
     bullet_solver_->getSelectedArmorPosAndVel(target_pos, target_vel, data_track_.position, data_track_.velocity,
