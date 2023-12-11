@@ -59,6 +59,7 @@ class ChassisVel
 public:
   ChassisVel(const ros::NodeHandle& nh)
   {
+    // 构造两个三维均值滤波器
     double num_data;
     nh.param("num_data", num_data, 20.0);
     nh.param("debug", is_debug_, true);
@@ -72,6 +73,7 @@ public:
   }
   std::shared_ptr<Vector3WithFilter<double>> linear_;
   std::shared_ptr<Vector3WithFilter<double>> angular_;
+  // 调用update会更新chassis_vel
   void update(double linear_vel[3], double angular_vel[3], double period)
   {
     // 时间少于0，出现错误，没更新时间则底盘速度无法准确更新
@@ -83,10 +85,10 @@ public:
       linear_->clear();
       angular_->clear();
     }
-    // 用容器储存线速度和角速度
+    // 用原始的速度数据输入到滤波器中，使用时只需要调用接口就可以获得滤波后的速度
     linear_->input(linear_vel);
     angular_->input(angular_vel);
-    // debug默认true，update函数走十次才进入一次if
+    // 下面是将速度发布出去，用于debug
     if (is_debug_ && loop_count_ % 10 == 0)
     {
       // real_pub_能上锁

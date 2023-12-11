@@ -135,7 +135,7 @@ void Controller::starting(const ros::Time& /*unused*/)
 
 void Controller::update(const ros::Time& time, const ros::Duration& period)
 {
-  // 用cmd_gimbal_读取<rm_msgs::GimbalCmd> cmd_rt_buffer_的buffer
+  // 从话题拿到的信息会被存到buffer中，用cmd_gimbal_读取<rm_msgs::GimbalCmd> cmd_rt_buffer_的buffer
   cmd_gimbal_ = *cmd_rt_buffer_.readFromRT();
   // 用data_track_读取<rm_msgs::TrackData> track_rt_buffer_的buffer
   data_track_ = *track_rt_buffer_.readFromNonRT();
@@ -176,10 +176,14 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
 
 void Controller::setDes(const ros::Time& time, double yaw_des, double pitch_des)
 {
+  // 创建Quaternion类的实例，这是tf类型的四元数;ros中四元数一种是msg类型，一种是tf类型
   tf2::Quaternion odom2base, odom2gimbal_des;
   tf2::Quaternion base2gimbal_des;
+  // 调用官方接口，将msg类型的四元数odom2base_.transform.rotation转换为tf类型odom2base
   tf2::fromMsg(odom2base_.transform.rotation, odom2base);
+  // 调用官方接口setRPY，通过欧拉角设置四元数的值
   odom2gimbal_des.setRPY(0, pitch_des, yaw_des);
+  // 通过四元数矩阵相乘得到base2gimbal_des；odom2base.inverse()返回odom2base这个旋转矩阵的逆矩阵
   base2gimbal_des = odom2base.inverse() * odom2gimbal_des;
   double roll_temp, base2gimbal_current_des_pitch, base2gimbal_current_des_yaw;
   quatToRPY(toMsg(base2gimbal_des), roll_temp, base2gimbal_current_des_pitch, base2gimbal_current_des_yaw);
@@ -227,14 +231,17 @@ void Controller::rate(const ros::Time& time, const ros::Duration& period)
   {  // on enter
     state_changed_ = false;
     ROS_INFO("[Gimbal] Enter RATE");
+    // 第一次切换到rate，会先用odom2pitch_给odom2gimbal_des_赋值，将初始的期望云台坐标系先设置成跟当前云台一样
     odom2gimbal_des_.transform.rotation = odom2pitch_.transform.rotation;
     odom2gimbal_des_.header.stamp = time;
+    // 将odom2gimbal_des_的转换信息存放到tf中，但是没有发布，发布要用另外的函数
     robot_state_handle_.setTransform(odom2gimbal_des_, "rm_gimbal_controllers");
   }
   else
   {
     double roll{}, pitch{}, yaw{};
     quatToRPY(odom2gimbal_des_.transform.rotation, roll, pitch, yaw);
+    // 设置期望坐标系的位置，rate模式下就是当前pitch/yaw，加上速度*时间，的到新的期望坐标系位置
     setDes(time, yaw + period.toSec() * cmd_gimbal_.rate_yaw, pitch + period.toSec() * cmd_gimbal_.rate_pitch);
   }
 }
@@ -501,7 +508,7 @@ void Controller::updateChassisVel()
   double linear_vel[3]{ linear_x, linear_y, linear_z };
   // angular_vel数组存储三个角速度
   double angular_vel[3]{ angular_x, angular_y, angular_z };
-  //
+  // 调用接口，丢到chassis_vel_这个类实例中，头文件已经说明，要拿速度的时候也是调用类中的接口
   chassis_vel_->update(linear_vel, angular_vel, tf_period);
   // 把现在时刻放入上一时刻,以遍再次进入循环记录最新时刻数据
   last_odom2base_ = odom2base_;
