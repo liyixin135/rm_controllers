@@ -69,8 +69,19 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
   controller_nh.getParam("friction_right", xml_rpc_value_right);
   d_srv_->setCallback(cb);
 
-  ros::NodeHandle nh_friction_l = ros::NodeHandle(controller_nh, "friction_left");
-  ros::NodeHandle nh_friction_r = ros::NodeHandle(controller_nh, "friction_right");
+  std::vector<ros::NodeHandle> nh_friction_l, nh_friction_r;
+  for (std::size_t i = 0; i < xml_rpc_value_left.size(); i++)
+  {
+    if (xml_rpc_value_left[i].getType() == XmlRpc::XmlRpcValue::TypeString &&
+        xml_rpc_value_right[i].getType() == XmlRpc::XmlRpcValue::TypeString)
+    {
+      std::string left_param_name = "friction_left/" + static_cast<std::string>(xml_rpc_value_left[i]);
+      std::string right_param_name = "friction_right/" + static_cast<std::string>(xml_rpc_value_right[i]);
+
+      nh_friction_l.push_back(ros::NodeHandle(controller_nh, left_param_name));
+      nh_friction_r.push_back(ros::NodeHandle(controller_nh, right_param_name));
+    }
+  }
   ros::NodeHandle nh_trigger = ros::NodeHandle(controller_nh, "trigger");
   effort_joint_interface_ = robot_hw->get<hardware_interface::EffortJointInterface>();
   return ctrl_friction_l_.init(effort_joint_interface_, nh_friction_l) &&
