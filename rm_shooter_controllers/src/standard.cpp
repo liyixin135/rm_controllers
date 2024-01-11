@@ -64,6 +64,9 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
   dynamic_reconfigure::Server<rm_shooter_controllers::ShooterConfig>::CallbackType cb = [this](auto&& PH1, auto&& PH2) {
     reconfigCB(std::forward<decltype(PH1)>(PH1), std::forward<decltype(PH2)>(PH2));
   };
+  XmlRpc::XmlRpcValue xml_rpc_value_left, xml_rpc_value_right;
+  controller_nh.getParam("friction_left", xml_rpc_value_left);
+  controller_nh.getParam("friction_right", xml_rpc_value_right);
   d_srv_->setCallback(cb);
 
   ros::NodeHandle nh_friction_l = ros::NodeHandle(controller_nh, "friction_left");
