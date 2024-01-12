@@ -38,6 +38,7 @@
 #include <rm_common/ros_utilities.h>
 #include <string>
 #include <pluginlib/class_list_macros.hpp>
+#include <memory>
 #include "rm_shooter_controllers/standard.h"
 
 namespace rm_shooter_controllers
@@ -68,20 +69,49 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
   controller_nh.getParam("friction_right", xml_rpc_value_right_);
   d_srv_->setCallback(cb);
 
-  std::vector<ros::NodeHandle> nh_friction_l, nh_friction_r;
   for (int i = 0; i < xml_rpc_value_left_.size(); i++)
   {
-    if (xml_rpc_value_left_[i].getType() == XmlRpc::XmlRpcValue::TypeString &&
-        xml_rpc_value_right_[i].getType() == XmlRpc::XmlRpcValue::TypeString)
+    if (xml_rpc_value_left_[i].getType() == XmlRpc::XmlRpcValue::TypeStruct &&
+        xml_rpc_value_right_[i].getType() == XmlRpc::XmlRpcValue::TypeStruct)
     {
-      std::string left_param_name = "friction_left/" + static_cast<std::string>(xml_rpc_value_left_[i]);
-      std::string right_param_name = "friction_right/" + static_cast<std::string>(xml_rpc_value_right_[i]);
+      left_it_ = xml_rpc_value_left_[i].begin();
+      right_it_ = xml_rpc_value_right_[i].begin();
 
-      nh_friction_l.push_back(ros::NodeHandle(controller_nh, left_param_name));
-      nh_friction_r.push_back(ros::NodeHandle(controller_nh, right_param_name));
-      ctrl_friction_l_[i].init(effort_joint_interface_, nh_friction_l[i]);
-      ctrl_friction_r_[i].init(effort_joint_interface_, nh_friction_r[i]);
+      while (left_it_ != xml_rpc_value_left_[i].end() && right_it_ != xml_rpc_value_right_[i].end())
+      {
+        std::string left_param_name = left_it_->first;
+        std::string right_param_name = right_it_->first;
+
+        ros::NodeHandle nh_friction_l(controller_nh, "friction_left/" + left_param_name);
+        ros::NodeHandle nh_friction_r(controller_nh, "friction_right/" + right_param_name);
+
+        if (i == 0)
+        {
+          std::string nh_namespace = nh_friction_l.getNamespace();
+          ROS_INFO("Namespace of nh_friction_l: %s", nh_namespace.c_str());
+        }
+
+        std::shared_ptr<effort_controllers::JointVelocityController> ctrl_friction_l =
+            std::make_shared<effort_controllers::JointVelocityController>();
+        std::shared_ptr<effort_controllers::JointVelocityController> ctrl_friction_r =
+            std::make_shared<effort_controllers::JointVelocityController>();
+
+        ctrl_friction_l->init(effort_joint_interface_, nh_friction_l);
+        ctrl_friction_r->init(effort_joint_interface_, nh_friction_r);
+        ctrl_friction_l_.push_back(ctrl_friction_l);
+        ctrl_friction_r_.push_back(ctrl_friction_r);
+
+        ++left_it_;
+        ++right_it_;
+      }
     }
+  }
+
+  for (const auto& controller : ctrl_friction_l_)
+  {
+    ROS_INFO("Joint Velocity Controller Name: %s", controller->getJointName().c_str());
+
+    // 这里可以根据需要打印更多的信息
   }
   ros::NodeHandle nh_trigger = ros::NodeHandle(controller_nh, "trigger");
   effort_joint_interface_ = robot_hw->get<hardware_interface::EffortJointInterface>();
@@ -136,8 +166,8 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
   }
   for (int i = 0; i < xml_rpc_value_left_.size(); i++)
   {
-    ctrl_friction_l_[i].update(time, period);
-    ctrl_friction_r_[i].update(time, period);
+    ctrl_friction_l_[i]->update(time, period);
+    ctrl_friction_r_[i]->update(time, period);
   }
   ctrl_trigger_.update(time, period);
 }
@@ -151,8 +181,8 @@ void Controller::stop(const ros::Time& time, const ros::Duration& period)
 
     for (int i = 0; i < xml_rpc_value_left_.size(); i++)
     {
-      ctrl_friction_l_[i].setCommand(0.);
-      ctrl_friction_r_[i].setCommand(0.);
+      ctrl_friction_l_[i]->setCommand(0.);
+      ctrl_friction_r_[i]->setCommand(0.);
     }
     ctrl_trigger_.setCommand(ctrl_trigger_.joint_.getPosition());
   }
@@ -179,10 +209,10 @@ void Controller::push(const ros::Time& time, const ros::Duration& period)
   for (int i = 0; i < xml_rpc_value_left_.size(); i++)
   {
     if (cmd_.wheel_speed == 0. ||
-        (ctrl_friction_l_[i].joint_.getVelocity() >= push_wheel_speed_threshold_ * ctrl_friction_l_[i].command_ &&
-         ctrl_friction_l_[i].joint_.getVelocity() > M_PI &&
-         ctrl_friction_r_[i].joint_.getVelocity() <= push_wheel_speed_threshold_ * ctrl_friction_r_[i].command_ &&
-         ctrl_friction_r_[i].joint_.getVelocity() < -M_PI))
+        (ctrl_friction_l_[i]->joint_.getVelocity() >= push_wheel_speed_threshold_ * ctrl_friction_l_[i]->command_ &&
+         ctrl_friction_l_[i]->joint_.getVelocity() > M_PI &&
+         ctrl_friction_r_[i]->joint_.getVelocity() <= push_wheel_speed_threshold_ * ctrl_friction_r_[i]->command_ &&
+         ctrl_friction_r_[i]->joint_.getVelocity() < -M_PI))
     {
       is_rotate_ = true;
     }
@@ -252,8 +282,8 @@ void Controller::setSpeed(const rm_msgs::ShootCmd& cmd)
       offset_wheel_speed_ = 220;
     else
       offset_wheel_speed_ = 0;
-    ctrl_friction_l_[i].setCommand(cmd_.wheel_speed + config_.extra_wheel_speed - offset_wheel_speed_);
-    ctrl_friction_r_[i].setCommand(-cmd_.wheel_speed - config_.extra_wheel_speed + offset_wheel_speed_);
+    ctrl_friction_l_[i]->setCommand(cmd_.wheel_speed + config_.extra_wheel_speed - offset_wheel_speed_);
+    ctrl_friction_r_[i]->setCommand(-cmd_.wheel_speed - config_.extra_wheel_speed + offset_wheel_speed_);
   }
 }
 

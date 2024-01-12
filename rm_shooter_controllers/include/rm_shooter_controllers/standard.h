@@ -83,7 +83,7 @@ private:
   void reconfigCB(rm_shooter_controllers::ShooterConfig& config, uint32_t /*level*/);
 
   hardware_interface::EffortJointInterface* effort_joint_interface_{};
-  std::vector<effort_controllers::JointVelocityController> ctrl_friction_l_, ctrl_friction_r_;
+  std::vector<std::shared_ptr<effort_controllers::JointVelocityController>> ctrl_friction_l_, ctrl_friction_r_;
   effort_controllers::JointPositionController ctrl_trigger_;
   int push_per_rotation_{};
   double push_wheel_speed_threshold_{};
@@ -93,6 +93,7 @@ private:
   bool maybe_block_ = false;
   bool is_rotate_ = false;
   XmlRpc::XmlRpcValue xml_rpc_value_left_, xml_rpc_value_right_;
+  XmlRpc::XmlRpcValue::ValueStruct::iterator left_it_, right_it_;
 
   ros::Time last_shoot_time_, block_time_, last_block_time_;
   enum
