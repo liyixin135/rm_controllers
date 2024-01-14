@@ -253,7 +253,7 @@ void Controller::setSpeed(const rm_msgs::ShootCmd& cmd)
 {
   for (int i = 0; i < 2; i++)
   {
-    if (i == 1)
+    if (i == 0)
       offset_wheel_speed_ = 220;
     else
       offset_wheel_speed_ = 0;
