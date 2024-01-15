@@ -139,7 +139,7 @@ void Controller::update(const ros::Time& time, const ros::Duration& period)
     shoot_state_pub_->msg_.state = state_;
     shoot_state_pub_->unlockAndPublish();
   }
-  for (int i = 0; i < 2; i++)
+  for (size_t i = 0; i < ctrls_friction_l_.size(); i++)
   {
     ctrls_friction_l_[i]->update(time, period);
     ctrls_friction_r_[i]->update(time, period);
@@ -154,7 +154,7 @@ void Controller::stop(const ros::Time& time, const ros::Duration& period)
     state_changed_ = false;
     ROS_INFO("[Shooter] Enter STOP");
 
-    for (int i = 0; i < 2; i++)
+    for (size_t i = 0; i < ctrls_friction_l_.size(); i++)
     {
       ctrls_friction_l_[i]->setCommand(0.);
       ctrls_friction_r_[i]->setCommand(0.);
@@ -181,7 +181,7 @@ void Controller::push(const ros::Time& time, const ros::Duration& period)
     state_changed_ = false;
     ROS_INFO("[Shooter] Enter PUSH");
   }
-  for (int i = 0; i < 2; i++)
+  for (size_t i = 0; i < ctrls_friction_l_.size(); i++)
   {
     if (cmd_.wheel_speed == 0. ||
         (ctrls_friction_l_[i]->joint_.getVelocity() >= push_wheel_speed_threshold_ * ctrls_friction_l_[i]->command_ &&
@@ -251,7 +251,7 @@ void Controller::block(const ros::Time& time, const ros::Duration& period)
 
 void Controller::setSpeed(const rm_msgs::ShootCmd& cmd)
 {
-  for (int i = 0; i < 2; i++)
+  for (size_t i = 0; i < ctrls_friction_l_.size(); i++)
   {
     if (i == 0)
       offset_wheel_speed_ = 220;
