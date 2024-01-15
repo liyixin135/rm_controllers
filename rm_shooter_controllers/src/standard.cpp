@@ -253,7 +253,7 @@ void Controller::setSpeed(const rm_msgs::ShootCmd& cmd)
 {
   for (size_t i = 0; i < ctrls_friction_l_.size(); i++)
   {
-    if (i == 0)
+    if (i == 1)
       offset_wheel_speed_ = 220;
     else
       offset_wheel_speed_ = 0;
