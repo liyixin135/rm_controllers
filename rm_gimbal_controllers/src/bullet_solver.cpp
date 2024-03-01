@@ -142,12 +142,12 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
   double r = r1;
   // z取相对于我方机器人的目标位置的z
   double z = pos.z;
-  // max_track_target_vel_默认给5，v_yaw装甲板旋转的角速度
-  // 如果装甲板旋转速度大于5，track_target给0
-  // 如果装甲板旋转速度小于5，track_target给1
+  // max_track_target_vel_是我们设置的参数max_track_target_vel
+  // 如果装甲板旋转速度大于max_track_target_vel_，track_target给0
+  // 如果装甲板旋转速度小于max_track_target_vel_，track_target给1
   track_target_ = std::abs(v_yaw) < max_track_target_vel_;
-  // 装甲板旋转速度大于5的情况下，switch_armor_angle等于pai/12
-  // 装甲板旋转速度小于5的情况下，switch_armor_angle等于什么什么
+  // 装甲板旋转速度大于max_track_target_vel_的情况下，switch_armor_angle等于pai/12
+  // 装甲板旋转速度小于max_track_target_vel_的情况下，switch_armor_angle等于什么什么
   double switch_armor_angle = track_target_ ?
                                   acos(r / target_rho) - M_PI / 12 +
                                       (-acos(r / target_rho) + M_PI / 6) * std::abs(v_yaw) / max_track_target_vel_ :
