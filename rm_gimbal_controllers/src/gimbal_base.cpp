@@ -68,8 +68,8 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
   ros::NodeHandle resistance_compensation_nh(controller_nh, "yaw/resistance_compensation");
   // 用resistance_compensation_nh句柄拿参数
   yaw_resistance_ = getParam(resistance_compensation_nh, "resistance", 0.);
-  velocity_dead_zone_ = getParam(resistance_compensation_nh, "velocity_dead_zone", 0.);
-  effort_dead_zone_ = getParam(resistance_compensation_nh, "effort_dead_zone", 0.);
+  velocity_saturation_point_ = getParam(resistance_compensation_nh, "velocity_saturation_point", 0.);
+  effort_saturation_point_ = getParam(resistance_compensation_nh, "effort_saturation_point", 0.);
 
   // 直接用controller_nh拿参数
   k_chassis_vel_ = getParam(controller_nh, "yaw/k_chassis_vel", 0.);
@@ -455,11 +455,12 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   ctrl_pitch_.update(time, period);
   double resistance_compensation = 0.;
   // 有速度就能进，一个速度一个力距
-  if (std::abs(ctrl_yaw_.joint_.getVelocity()) > velocity_dead_zone_)
-    resistance_compensation = (ctrl_yaw_.joint_.getVelocity() > 0 ? 1 : -1) *
-                              yaw_resistance_;  // resistance_compensation是考虑阻力增幅后的速度
-  else if (std::abs(ctrl_yaw_.joint_.getCommand()) > effort_dead_zone_)
+  if (std::abs(ctrl_yaw_.joint_.getVelocity()) > velocity_saturation_point_)
+    resistance_compensation = (ctrl_yaw_.joint_.getVelocity() > 0 ? 1 : -1) * yaw_resistance_;
+  else if (std::abs(ctrl_yaw_.joint_.getCommand()) > effort_saturation_point_)
     resistance_compensation = (ctrl_yaw_.joint_.getCommand() > 0 ? 1 : -1) * yaw_resistance_;
+  else
+    resistance_compensation = ctrl_yaw_.joint_.getCommand() * yaw_resistance_ / effort_saturation_point_;
   // 给yaw设置速度指令，速度等于命令减掉底盘本身有的速度，再加上阻力增幅
   ctrl_yaw_.joint_.setCommand(ctrl_yaw_.joint_.getCommand() - k_chassis_vel_ * chassis_vel_->angular_->z() +
                               yaw_k_v_ * yaw_vel_des + resistance_compensation);
