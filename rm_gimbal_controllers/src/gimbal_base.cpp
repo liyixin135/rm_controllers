@@ -46,6 +46,7 @@
 
 namespace rm_gimbal_controllers
 {
+// 初始化
 bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& root_nh, ros::NodeHandle& controller_nh)
 {
   // 用XmlRpcValue类探取feedforward命名空间的三个数据
@@ -255,23 +256,24 @@ void Controller::track(const ros::Time& time)
     ROS_INFO("[Gimbal] Enter TRACK");
   }
   double roll_real, pitch_real, yaw_real;
-  // 把位置转换为三个欧拉角
+  // 把在pitch位置关系转换为三个欧拉角
   quatToRPY(odom2pitch_.transform.rotation, roll_real, pitch_real, yaw_real);
-  // 定义了yaw_compute
+  // yaw_compute以yaw位置作为原点位置
   double yaw_compute = yaw_real;
-  // pitch方向上要给负值
+  // pitch_compute以pitch位置作为原点位置
   double pitch_compute = -pitch_real;
-  // 用target_pos和target_vel从视觉读取目标中心位置和目标中心速度
+  // 用target_pos和target_vel从视觉读取目标中心位置和目标中心速度，均在相机坐标系下
   geometry_msgs::Point target_pos = data_track_.position;
   geometry_msgs::Vector3 target_vel = data_track_.velocity;
   try
   {
     if (!data_track_.header.frame_id.empty())  // 如果视觉那边坐标系不是空的，就进去
     {
-      // 定义好要交换的坐标系
+      // 定义好要交换的坐标系，就是把视觉发过来的数据都转化为odom坐标系下的数据，利用transform实现
       geometry_msgs::TransformStamped transform =
           robot_state_handle_.lookupTransform("odom", data_track_.header.frame_id, data_track_.header.stamp);
       // 用官方接口把position和velocity转换到odom坐标系
+      // target_pos，target_vel都变为odom坐标下的敌方车中心位置和中心速度
       tf2::doTransform(target_pos, target_pos, transform);
       tf2::doTransform(target_vel, target_vel, transform);
     }
@@ -280,20 +282,25 @@ void Controller::track(const ros::Time& time)
   {
     ROS_WARN("%s", ex.what());
   }
-  // 用target_pos和target_vel转变为相对yaw和pitch的位置和速度
+  // target_pos变为相对于pitch的位置
+  // target_vel变为相对于底盘的速度
   target_pos.x -= odom2pitch_.transform.translation.x;
   target_pos.y -= odom2pitch_.transform.translation.y;
   target_pos.z -= odom2pitch_.transform.translation.z;
   target_vel.x -= chassis_vel_->linear_->x();
   target_vel.y -= chassis_vel_->linear_->y();
   target_vel.z -= chassis_vel_->linear_->z();
-  // 调用solve函数，用solve_success作为该函数的标志位
-  // 传进去的在odom坐标系下的target_pos和target_vel
+  // target_pos相对于pitch敌方车中心的位置
+  // target_vel相对于底盘敌方车中心速度
+  // bullet_speed子弹速度
+  //  装甲板的朝向yaw值相对我方机器人,
+  // v_yaw装甲板旋转的角速度,r1半径1, r2半径2, dz相邻装甲板的高度差, armors_num装甲板数量
+  // 解算成功了标志位给1
   bool solve_success =
       bullet_solver_->solve(target_pos, target_vel, cmd_gimbal_.bullet_speed, data_track_.yaw, data_track_.v_yaw,
                             data_track_.radius_1, data_track_.radius_2, data_track_.dz, data_track_.armors_num);
 
-  if (publish_rate_ > 0.0 && last_publish_time_ + ros::Duration(1.0 / publish_rate_) < time)
+  if (publish_rate_ > 0.0 && last_publish_time_ + ros::Duration(1.0 / publish_rate_) < time)  // 发布频率，我记得是50
   {
     if (error_pub_->trylock())
     {

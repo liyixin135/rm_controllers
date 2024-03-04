@@ -54,28 +54,29 @@ BulletSolver::BulletSolver(ros::NodeHandle& controller_nh)
               .delay = getParam(controller_nh, "delay", 0.),
               .dt = getParam(controller_nh, "dt", 0.),
               .timeout = getParam(controller_nh, "timeout", 0.) };
+  // max_track_target_vel_它是最大跟随敌方目标的速度
   max_track_target_vel_ = getParam(controller_nh, "max_track_target_vel", 5.0);
   // 把数据放在缓存区
   config_rt_buffer_.initRT(config_);
 
-  // visualization_msgs::Marker marker_desire_ 调用库内结构体，我们起名为marker_desire_
-  marker_desire_.header.frame_id = "odom";                   // 坐标系
-  marker_desire_.ns = "model";                               // 命名空间
-  marker_desire_.action = visualization_msgs::Marker::ADD;   // 操作，是添加还是修改还是删除
-  marker_desire_.type = visualization_msgs::Marker::POINTS;  // 类型
-  // 靶子大小为0.02*0.02
-  marker_desire_.scale.x = 0.02;
-  marker_desire_.scale.y = 0.02;
-  // marker_desire_靶子颜色为红色
-  marker_desire_.color.r = 1.0;
-  marker_desire_.color.g = 0.0;
-  marker_desire_.color.b = 0.0;
-  marker_desire_.color.a = 1.0;
+  // visualization_msgs::Marker marker_desire_ 调用库内结构体，我们起名为marker_desire_，用来显示敌方目标
+  marker_desire_.header.frame_id = "odom";  // 显示均是在odom下
+  marker_desire_.ns = "model";  // 设置标记的命名空间为 "model"。命名空间可以帮助将标记进行分组，使其更易于管理。
+  marker_desire_.action = visualization_msgs::Marker::ADD;  // 设置标记的动作为添加。这表示标记将被添加到可视化中。
+  marker_desire_.type =
+      visualization_msgs::Marker::POINTS;  // 设置标记的类型为点。将表示为一系列点，通常用于表示离散的位置或目标点。
+  marker_desire_.scale.x = 0.02;  // 每个标记点的 x 轴方向上的尺寸为 0.02。
+  marker_desire_.scale.y = 0.02;  // 每个标记点的 y 轴方向上的尺寸为 0.02。
 
-  // visualization_msgs::Marker marker_real_，再次调用库内结构体，清明为marker_desire_
+  marker_desire_.color.r = 1.0;  // 完全红色
+  marker_desire_.color.g = 0.0;  // 没有绿色
+  marker_desire_.color.b = 0.0;  // 没有蓝色
+  marker_desire_.color.a = 1.0;  // 标记物不透明
+
+  // visualization_msgs::Marker marker_real_，再次调用库内结构体，起名为marker_desire_
   marker_real_ = marker_desire_;
   marker_real_.color.r = 0.0;
-  // marker_desire_ 靶子颜色为绿色
+  // marker_desire_ 敌方中心点颜色为绿色，也在odom坐标系下，命名空间也是model，也是点，大小也一样
   marker_real_.color.g = 1.0;
 
   // 动态调参
@@ -84,12 +85,15 @@ BulletSolver::BulletSolver(ros::NodeHandle& controller_nh)
       [this](auto&& PH1, auto&& PH2) { reconfigCB(PH1, PH2); };
   d_srv_->setCallback(cb);
 
-  // std::shared_ptr<realtime_tools::RealtimePublisher<visualization_msgs::Marker>> path_desire_pub_
-  // path_desire_pub_消息类型为visualization_msgs::Marker
-  // path_desire_pub发布在“model_desire”下
+  // path_desire_pub_是一个智能指针，类型是realtime_tools::RealtimePublisher<visualization_msgs::Marker>
+  // reset方法用于替换智能指针中当前管理的对象。这里，它创建了一个新的RealtimePublisher<visualization_msgs::Marker>实例，
+  // 将其地址赋给path_desire_pub_智能指针。这个新的RealtimePublisher对象用于发布visualization_msgs::Marker类型的消息。
+  // controller_nh用于ros节点的通信，如确定所在的命名空间
+  // path_desire_pub发布在“model_desire”话题下
+  // 10是队列大小
   path_desire_pub_.reset(
       new realtime_tools::RealtimePublisher<visualization_msgs::Marker>(controller_nh, "model_desire", 10));
-  // path_real_pub_发布在“model_real”下
+  // path_real_pub_发布在“model_real”话题下，其他都跟上面一下
   path_real_pub_.reset(
       new realtime_tools::RealtimePublisher<visualization_msgs::Marker>(controller_nh, "model_real", 10));
 }
@@ -113,13 +117,15 @@ double BulletSolver::getResistanceCoefficient(double bullet_speed) const
 }
 
 // 标志位solve_success拿的是BulletSolver::solve函数的return值
-// solve(pos相对于我方机器人的目标中心位置, vel相对于我方机器人的目标速度, bullet_speed子弹速度, 装甲板的朝向yaw值相对我方机器人,
+// solve(pos相对于我方机器人的目标中心位置, vel相对于我方机器人的目标速度, bullet_speed子弹速度cmd_gimbal_.bullet_speed,
+// 装甲板的朝向yaw值相对我方机器人,
 //        v_yaw装甲板旋转的角速度,r1半径1, r2半径2, dz相邻装甲板的高度差, armors_num装甲板数量);
 bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double bullet_speed, double yaw,
                          double v_yaw, double r1, double r2, double dz, int armors_num)
 {
   // config_拿了一堆参数
   config_ = *config_rt_buffer_.readFromRT();
+  // 子弹飞行速度
   bullet_speed_ = bullet_speed;
   // 对应弹速拿resistance_coff_值，目前车上均为0
   resistance_coff_ = getResistanceCoefficient(bullet_speed_) != 0 ? getResistanceCoefficient(bullet_speed_) : 0.001;
@@ -146,72 +152,70 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
   // 如果装甲板旋转速度大于max_track_target_vel_，track_target给0
   // 如果装甲板旋转速度小于max_track_target_vel_，track_target给1
   track_target_ = std::abs(v_yaw) < max_track_target_vel_;
-  // 装甲板旋转速度大于max_track_target_vel_的情况下，switch_armor_angle等于pai/12
-  // 装甲板旋转速度小于max_track_target_vel_的情况下，switch_armor_angle等于什么什么
+  // 设置为能打就算角度，设置为不能打直接给个角度
   double switch_armor_angle = track_target_ ?
                                   acos(r / target_rho) - M_PI / 12 +
                                       (-acos(r / target_rho) + M_PI / 6) * std::abs(v_yaw) / max_track_target_vel_ :
                                   M_PI / 12;
-  // switch_armor_angle是计算车中心与装甲板相对于我方机器人的角度
-  // 情况一，装甲板预期位置大于我们所能达到位置，
-  // 情况二，装甲板预期位置小于我们所能达到位置，
+  // 当v_yaw > 0（顺时针旋转）且预期朝向超过了容忍区间的上限时，可能需要切换到一个更适合当前旋转方向的装甲板。
+  // 当v_yaw < 0（逆时针旋转）且预期朝向低于了容忍区间的下限时，同样可能需要切换到另一个更适合的装甲板
+  // 本质就是追不上了
   if ((((yaw + v_yaw * rough_fly_time) > output_yaw_ + switch_armor_angle) && v_yaw > 0.) ||
       (((yaw + v_yaw * rough_fly_time) < output_yaw_ - switch_armor_angle) && v_yaw < 0.))
   {
-    // 装甲板角速度正向给-1，反向给1
-    // 这里本质是需要换下一块或者上一块板子
+    // 装甲板角速度正向给-1，反向给1，就是反着敌方yaw旋转方向走，去找它转到中心的下一块
     selected_armor_ = v_yaw > 0. ? -1 : 1;
     // 装甲板数目是4，r取r2，前面已经算完了r1，后面开始算r2
     // 如果不需要板子，r2根本不需要出现
     r = armors_num == 4 ? r2 : r1;
     // 如果装甲板数目是4，z等于中心位置加上偏差dz，即为下一块或者上一块装甲板的实际z位置
-    // 如果装甲板数目不是4，那么z的位置就是目标位置z
+    // 如果装甲板数目不是4，那么z的位置就是目标位置z，例如平衡步兵
     z = armors_num == 4 ? pos.z + dz : pos.z;
   }
   int count{};
   double error = 999;
   // 本质为了算目标位置的xy
-  if (track_target_)  // 装甲板速度小于5进if
+  if (track_target_)  // 低速模式
   {
     // target_pos_第一次出现
+    // target_pos_算得是装甲板的目标位置，算上了它正在转，selected_armor_是在决定打不打下一块
     target_pos_.x = pos.x - r * cos(yaw + selected_armor_ * 2 * M_PI / armors_num);
     target_pos_.y = pos.y - r * sin(yaw + selected_armor_ * 2 * M_PI / armors_num);
   }
-  else  // 装甲板速度大于5进else
+  else  // 打中心模式，算车正对中点
   {
     target_pos_.x = pos.x - r * cos(atan2(pos.y, pos.x));
     target_pos_.y = pos.y - r * sin(atan2(pos.y, pos.x));
   }
-  // 情况具体为如果为4块装甲板的兵种，并且这块装甲板它打不到了，只能重新计算z
-  // target_pos_.z在这里完成了真正的目标位置赋值
+  // 完成target_pos_的所有赋值，如果前面觉得打不到了，就有加dz操作，如果不打下一块，直接等于pos.z
   target_pos_.z = z;
   // 第一次直接进循环，error默认
-  while (error >= 0.001)
+  while (error >= 0.001)  // 如果迭代了20次，error还是大于0.001,即表示解算失败
   {
-    // 又重新计算相对yaw值，相对pitch值，我敌距离，粗略飞行时间
+    // 前面算上敌方装甲板的运动，得到了新的target_pos_数据，接而又重新计算相对yaw值，相对pitch值，我敌距离，粗略飞行时间
     output_yaw_ = std::atan2(target_pos_.y, target_pos_.x);
     output_pitch_ = std::atan2(temp_z, std::sqrt(std::pow(target_pos_.x, 2) + std::pow(target_pos_.y, 2)));
     target_rho = std::sqrt(std::pow(target_pos_.x, 2) + std::pow(target_pos_.y, 2));
     fly_time_ =
         (-std::log(1 - target_rho * resistance_coff_ / (bullet_speed_ * std::cos(output_pitch_)))) / resistance_coff_;
-    //
+    // 计算子弹在飞行一定时间后的实际垂直位置
     double real_z = (bullet_speed_ * std::sin(output_pitch_) + (config_.g / resistance_coff_)) *
                         (1 - std::exp(-resistance_coff_ * fly_time_)) / resistance_coff_ -
                     config_.g * fly_time_ / resistance_coff_;
 
-    if (track_target_)  // 装甲板速度小于5进
+    if (track_target_)  // 低速模式
     {
-      // 重新计算目标位置的x和y
+      // 重新计算目标位置的x和y，不仅算上了它在转，还算上了敌方车中心在运动，selected_armor_是为了打下一块而设置
       target_pos_.x =
           pos.x + vel.x * fly_time_ - r * cos(yaw + v_yaw * fly_time_ + selected_armor_ * 2 * M_PI / armors_num);
       target_pos_.y =
           pos.y + vel.y * fly_time_ - r * sin(yaw + v_yaw * fly_time_ + selected_armor_ * 2 * M_PI / armors_num);
     }
-    else  // 装甲板速度大于5进
+    else  // 打中心模式
     {
       // 写个数组，保存飞行后目标位置的x和y
       double target_pos_after_fly_time[2];
-      // 计算出来飞行后目标位置的x和y
+      // 计算出来飞行后目标位置的x和y（算上了敌方车中心的运动，不用算转了，角度被固定死了
       target_pos_after_fly_time[0] = pos.x + vel.x * fly_time_;
       target_pos_after_fly_time[1] = pos.y + vel.y * fly_time_;
       // 利用上面，重新计算目标位置的x和y
@@ -220,18 +224,18 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
       target_pos_.y =
           target_pos_after_fly_time[1] - r * sin(atan2(target_pos_after_fly_time[1], target_pos_after_fly_time[0]));
     }
-    // 重新计算z的位置
+    // 重新计算z的位置，在z方向上面不转
     target_pos_.z = z + vel.z * fly_time_;
 
     // 又重新定义一个target_yaw算目标位置所在的yaw的角
     double target_yaw = std::atan2(target_pos_.y, target_pos_.x);
-    // 计算偏差角
+    // 计算误差偏差角
     double error_theta = target_yaw - output_yaw_;
-    // 计算偏差z
+    // 计算误差偏差z
     double error_z = target_pos_.z - real_z;
     // 把偏差z进行累加到temp_z
     temp_z += error_z;
-    // 计算出真正的error
+    // 计算出真正的error，即在xyz空间体系中的距离
     error = std::sqrt(std::pow(error_theta * target_rho, 2) + std::pow(error_z, 2));
     // 走一次count加1
     count++;
@@ -242,18 +246,28 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
   return true;
 }
 
+// armor_pos是在odom坐标下敌方车中心的位置
+// armor_vel是在odom坐标下敌方车中心的速度
+// pos是在相机坐标系下敌方车中心的位置
+// vel是在相机坐标系下敌方车中心的速度
+// yaw是在相机坐标系装甲板的朝向yaw
+// v_yaw是在相机坐标系下装甲板旋转的角速度
+// armors_num指看见的兵种是几块装甲板的
+// 函数就是得到选中装甲板的位置和速度
 void BulletSolver::getSelectedArmorPosAndVel(geometry_msgs::Point& armor_pos, geometry_msgs::Vector3& armor_vel,
                                              geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double yaw,
                                              double v_yaw, double r1, double r2, double dz, int armors_num)
 {
   double r = r1, z = pos.z;
+  // 如果对方是4块装甲板并且敌方装甲板是在运动的
   if (armors_num == 4 && selected_armor_ != 0)
   {
     r = r2;
     z = pos.z + dz;
   }
-  if (track_target_)
+  if (track_target_)  // 小于max_track_target_vel_，即不是打中间模式
   {
+    // pos.x
     armor_pos.x = pos.x - r * cos(yaw + selected_armor_ * 2 * M_PI / armors_num);
     armor_pos.y = pos.y - r * sin(yaw + selected_armor_ * 2 * M_PI / armors_num);
     armor_pos.z = z;
@@ -271,12 +285,16 @@ void BulletSolver::getSelectedArmorPosAndVel(geometry_msgs::Point& armor_pos, ge
 
 void BulletSolver::bulletModelPub(const geometry_msgs::TransformStamped& odom2pitch, const ros::Time& time)
 {
+  // 清除了point上面的所有点，以便添加最新的可视化信息，不会因为旧数据累计而变得混乱
   marker_desire_.points.clear();
   marker_real_.points.clear();
   double roll{}, pitch{}, yaw{};
+  // 通过quatToRPY函数将odom2pitch转换为roll,pitch,yaw
   quatToRPY(odom2pitch.transform.rotation, roll, pitch, yaw);
   geometry_msgs::Point point_desire{}, point_real{};
+  // 是在xoy平面我方机器人和敌方机器人的距离
   double target_rho = std::sqrt(std::pow(target_pos_.x, 2) + std::pow(target_pos_.y, 2));
+  //
   int point_num = int(target_rho * 20);
   for (int i = 0; i <= point_num; i++)
   {
@@ -360,6 +378,7 @@ double BulletSolver::getGimbalError(geometry_msgs::Point pos, geometry_msgs::Vec
   return error;
 }
 
+// 有关动态调参的
 void BulletSolver::reconfigCB(rm_gimbal_controllers::BulletSolverConfig& config, uint32_t /*unused*/)
 {
   ROS_INFO("[Bullet Solver] Dynamic params change");
