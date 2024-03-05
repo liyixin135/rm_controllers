@@ -304,24 +304,31 @@ void Controller::track(const ros::Time& time)
   {
     if (error_pub_->trylock())
     {
+      // target_pos相对于pitch敌方车中心的位置,target_vel相对于底盘敌方车中心速度,yaw装甲板的朝向yaw值相对我方机器人,v_yaw装甲板旋转的角速度
+      // r1,r2,dz,armors_num,yaw_compute现在车yaw的位置，pitch_compute现在车pitch的位置
+      // bullet_speed子弹速度
       double error =
           bullet_solver_->getGimbalError(target_pos, target_vel, data_track_.yaw, data_track_.v_yaw,
                                          data_track_.radius_1, data_track_.radius_2, data_track_.dz,
                                          data_track_.armors_num, yaw_compute, pitch_compute, cmd_gimbal_.bullet_speed);
-      error_pub_->msg_.stamp = time;
+      error_pub_->msg_.stamp = time;  // 时间戳是ros_time
+      // 解算成功就给算出来的gimbal_error，解算u不成功gimbal_error直接等于1
       error_pub_->msg_.error = solve_success ? error : 1.0;
-      error_pub_->unlockAndPublish();
+      error_pub_->unlockAndPublish();  // error_pub_不锁话题并且发布
     }
+    // 发布模型
     bullet_solver_->bulletModelPub(odom2pitch_, time);
     last_publish_time_ = time;
   }
 
-  if (solve_success)
+  if (solve_success)  // 如果解算成功
+    // bullet_solver_->getYaw()为现在我方头yaw需要偏向敌方车的角度
+    // bullet_solver_->getPitch()为现在我方头pitch需要偏向敌方车的角度
     setDes(time, bullet_solver_->getYaw(), bullet_solver_->getPitch());
-  else
+  else  // 解算失败
   {
     odom2gimbal_des_.header.stamp = time;
-    robot_state_handle_.setTransform(odom2gimbal_des_, "rm_gimbal_controllers");
+    robot_state_handle_.setTransform(odom2gimbal_des_, "rm_gimbal_controllers");  // 重置瞄准系统，安全措施吧
   }
 }
 

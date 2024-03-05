@@ -336,33 +336,41 @@ void BulletSolver::bulletModelPub(const geometry_msgs::TransformStamped& odom2pi
   }
 }
 
+// pos相对于pitch敌方车中心的位置,vel相对于底盘敌方车中心速度,yaw装甲板的朝向yaw值相对我方机器人,v_yaw装甲板旋转的角速度
+// r1,r2,dz,armors_num,yaw_real现在车yaw的位置，pitch_real现在车pitch的位置
+// bullet_speed子弹速度
 double BulletSolver::getGimbalError(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double yaw, double v_yaw,
                                     double r1, double r2, double dz, int armors_num, double yaw_real, double pitch_real,
                                     double bullet_speed)
 {
-  double delay = track_target_ ? 0 : config_.delay;
+  double delay = track_target_ ? 0 : config_.delay;  // 如果用中心模式，则用延迟模式
+  // 先设置一波默认参数，r1以及目标中心位置的z
   double r = r1;
   double z = pos.z;
-  if (selected_armor_ != 0)
+  if (selected_armor_ != 0)  // 如果是打下一块，r切r2，z加上dz
   {
     r = armors_num == 4 ? r2 : r1;
     z = armors_num == 4 ? pos.z + dz : pos.z;
   }
-  double error;
-  if (track_target_)
+  double error;       // 定义error
+  if (track_target_)  // 如果低速模式
   {
+    // 忽略延迟对瞄准的影响，直接计算发射距离（在xyz空间
     double bullet_rho =
         bullet_speed * std::cos(pitch_real) * (1 - std::exp(-resistance_coff_ * fly_time_)) / resistance_coff_;
+    // 分解到xyz三个方向
     double bullet_x = bullet_rho * std::cos(yaw_real);
     double bullet_y = bullet_rho * std::sin(yaw_real);
     double bullet_z = (bullet_speed * std::sin(pitch_real) + (config_.g / resistance_coff_)) *
                           (1 - std::exp(-resistance_coff_ * fly_time_)) / resistance_coff_ -
                       config_.g * fly_time_ / resistance_coff_;
+    // 根据目标位置计算真正的gimbal_error
     error = std::sqrt(std::pow(target_pos_.x - bullet_x, 2) + std::pow(target_pos_.y - bullet_y, 2) +
                       std::pow(target_pos_.z - bullet_z, 2));
   }
-  else
+  else  // 如果中心模式
   {
+    // 算上延迟算真正的gimbal_error
     geometry_msgs::Point target_pos_after_fly_time_and_delay{};
     target_pos_after_fly_time_and_delay.x =
         pos.x + vel.x * (fly_time_ + delay) -
@@ -375,7 +383,7 @@ double BulletSolver::getGimbalError(geometry_msgs::Point pos, geometry_msgs::Vec
                       std::pow(target_pos_.y - target_pos_after_fly_time_and_delay.y, 2) +
                       std::pow(target_pos_.z - target_pos_after_fly_time_and_delay.z, 2));
   }
-  return error;
+  return error;  // 直接返回error
 }
 
 // 有关动态调参的
