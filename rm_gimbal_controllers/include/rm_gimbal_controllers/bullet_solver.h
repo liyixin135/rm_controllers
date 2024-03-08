@@ -46,6 +46,7 @@
 #include <rm_common/hardware_interface/robot_state_interface.h>
 #include <rm_common/eigen_types.h>
 #include <rm_common/ros_utilities.h>
+#include <rm_msgs/TrackData.h>
 
 namespace rm_gimbal_controllers
 {
@@ -85,6 +86,10 @@ private:
   std::shared_ptr<realtime_tools::RealtimePublisher<visualization_msgs::Marker>> path_real_pub_;
   realtime_tools::RealtimeBuffer<Config> config_rt_buffer_;
   dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>* d_srv_{};
+  rm_msgs::TrackData compute_target_position_;
+  ros::NodeHandle controller_nh_;
+  ros::Publisher compute_target_position_pub =
+      controller_nh_.advertise<rm_msgs::TrackData>("compute_target_position", 100);
   Config config_{};
   double max_track_target_vel_;
   bool dynamic_reconfig_initialized_{};

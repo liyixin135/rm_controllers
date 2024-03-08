@@ -180,6 +180,11 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
     if (count >= 20 || std::isnan(error))
       return false;
   }
+  //  compute_target_position_.reset(new rm_msgs::TrackData());
+  compute_target_position_.position.x = target_pos_.x;
+  compute_target_position_.position.y = target_pos_.y;
+  compute_target_position_.position.z = target_pos_.z;
+  compute_target_position_pub.publish(compute_target_position_);
   return true;
 }
 
