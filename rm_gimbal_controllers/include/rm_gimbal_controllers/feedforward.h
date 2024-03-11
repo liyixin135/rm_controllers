@@ -7,6 +7,8 @@
 #include <XmlRpc.h>
 #include <geometry_msgs/Vector3.h>
 #include <urdf/model.h>
+#include <dynamic_reconfigure/server.h>
+#include <rm_gimbal_controllers/FeedForwardConfig.h>
 #include <rm_common/hardware_interface/robot_state_interface.h>
 
 class FrictionCompensation
@@ -25,9 +27,11 @@ class InputFeedforward
 public:
   void init(XmlRpc::XmlRpcValue config);
   double output(double vel_desire, double accel_desire) const;
+  void reconfigCB(rm_gimbal_controllers::FeedForwardConfig& config, uint32_t level);
 
 private:
   double k_v_{ 0. }, k_a_{ 0. };
+  dynamic_reconfigure::Server<rm_gimbal_controllers::FeedForwardConfig>* srv_;
 };
 
 class GravityCompensation

@@ -31,8 +31,19 @@ double FrictionCompensation::output(double vel_act, double effort_cmd) const
 void InputFeedforward::init(XmlRpc::XmlRpcValue config)
 {
   ROS_ASSERT(config.getType() == XmlRpc::XmlRpcValue::TypeStruct);
+  ros::NodeHandle nh("/rm_gimbal_controllers/feedforward_reconfig");
+  srv_ = new dynamic_reconfigure::Server<rm_gimbal_controllers::FeedForwardConfig>(nh);
+  dynamic_reconfigure::Server<rm_gimbal_controllers::FeedForwardConfig>::CallbackType cb =
+      boost::bind(&InputFeedforward::reconfigCB, this, _1, _2);
+  srv_->setCallback(cb);
   k_v_ = config.hasMember("k_v") ? static_cast<double>(config["k_v"]) : 0.;
   k_a_ = config.hasMember("k_a") ? static_cast<double>(config["k_a"]) : 0.;
+}
+
+void InputFeedforward::reconfigCB(rm_gimbal_controllers::FeedForwardConfig& config, uint32_t level)
+{
+  k_v_ = config.k_v;
+  k_a_ = config.k_a;
 }
 
 double InputFeedforward::output(double vel_desire, double accel_desire) const
