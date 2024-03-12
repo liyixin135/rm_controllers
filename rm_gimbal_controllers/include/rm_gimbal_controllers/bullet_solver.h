@@ -105,7 +105,7 @@ private:
   rm_msgs::TrackData compute_target_position_;
   ros::NodeHandle controller_nh_;
   ros::Publisher compute_target_position_pub =
-      controller_nh_.advertise<rm_msgs::TrackData>("compute_target_position", 100);
+      controller_nh_.advertise<rm_msgs::TrackData>("compute_target_position", 5);
   Config config_{};
   double max_track_target_vel_;
   bool dynamic_reconfig_initialized_{};
