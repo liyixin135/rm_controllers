@@ -136,8 +136,8 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
   }
   else
   {
-    target_pos_.x = pos.x - r * cos(atan2(pos.y, pos.x));
-    target_pos_.y = pos.y - r * sin(atan2(pos.y, pos.x));
+    target_pos_.x = pos.x;
+    target_pos_.y = pos.y;
   }
   target_pos_.z = z;
   while (error >= 0.001)
@@ -163,10 +163,8 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
       double target_pos_after_fly_time[2];
       target_pos_after_fly_time[0] = pos.x + vel.x * fly_time_;
       target_pos_after_fly_time[1] = pos.y + vel.y * fly_time_;
-      target_pos_.x =
-          target_pos_after_fly_time[0] - r * cos(atan2(target_pos_after_fly_time[1], target_pos_after_fly_time[0]));
-      target_pos_.y =
-          target_pos_after_fly_time[1] - r * sin(atan2(target_pos_after_fly_time[1], target_pos_after_fly_time[0]));
+      target_pos_.x = target_pos_after_fly_time[0];
+      target_pos_.y = target_pos_after_fly_time[1];
     }
     target_pos_.z = z + vel.z * fly_time_;
 
@@ -259,45 +257,18 @@ void BulletSolver::bulletModelPub(const geometry_msgs::TransformStamped& odom2pi
   }
 }
 
-double BulletSolver::getGimbalError(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double yaw, double v_yaw,
-                                    double r1, double r2, double dz, int armors_num, double yaw_real, double pitch_real,
-                                    double bullet_speed)
+double BulletSolver::getGimbalError(double yaw_real, double pitch_real, double bullet_speed)
 {
-  double delay = track_target_ ? 0 : config_.delay;
-  double r = r1;
-  double z = pos.z;
-  if (selected_armor_ != 0)
-  {
-    r = armors_num == 4 ? r2 : r1;
-    z = armors_num == 4 ? pos.z + dz : pos.z;
-  }
   double error;
-  if (track_target_)
-  {
-    double bullet_rho =
-        bullet_speed * std::cos(pitch_real) * (1 - std::exp(-resistance_coff_ * fly_time_)) / resistance_coff_;
-    double bullet_x = bullet_rho * std::cos(yaw_real);
-    double bullet_y = bullet_rho * std::sin(yaw_real);
-    double bullet_z = (bullet_speed * std::sin(pitch_real) + (config_.g / resistance_coff_)) *
-                          (1 - std::exp(-resistance_coff_ * fly_time_)) / resistance_coff_ -
-                      config_.g * fly_time_ / resistance_coff_;
-    error = std::sqrt(std::pow(target_pos_.x - bullet_x, 2) + std::pow(target_pos_.y - bullet_y, 2) +
-                      std::pow(target_pos_.z - bullet_z, 2));
-  }
-  else
-  {
-    geometry_msgs::Point target_pos_after_fly_time_and_delay{};
-    target_pos_after_fly_time_and_delay.x =
-        pos.x + vel.x * (fly_time_ + delay) -
-        r * cos(yaw + v_yaw * (fly_time_ + delay) + selected_armor_ * 2 * M_PI / armors_num);
-    target_pos_after_fly_time_and_delay.y =
-        pos.y + vel.y * (fly_time_ + delay) -
-        r * sin(yaw + v_yaw * (fly_time_ + delay) + selected_armor_ * 2 * M_PI / armors_num);
-    target_pos_after_fly_time_and_delay.z = z + vel.z * (fly_time_ + delay);
-    error = std::sqrt(std::pow(target_pos_.x - target_pos_after_fly_time_and_delay.x, 2) +
-                      std::pow(target_pos_.y - target_pos_after_fly_time_and_delay.y, 2) +
-                      std::pow(target_pos_.z - target_pos_after_fly_time_and_delay.z, 2));
-  }
+  double bullet_rho =
+      bullet_speed * std::cos(pitch_real) * (1 - std::exp(-resistance_coff_ * fly_time_)) / resistance_coff_;
+  double bullet_x = bullet_rho * std::cos(yaw_real);
+  double bullet_y = bullet_rho * std::sin(yaw_real);
+  double bullet_z = (bullet_speed * std::sin(pitch_real) + (config_.g / resistance_coff_)) *
+                        (1 - std::exp(-resistance_coff_ * fly_time_)) / resistance_coff_ -
+                    config_.g * fly_time_ / resistance_coff_;
+  error = std::sqrt(std::pow(target_pos_.x - bullet_x, 2) + std::pow(target_pos_.y - bullet_y, 2) +
+                    std::pow(target_pos_.z - bullet_z, 2));
   return error;
 }
 
