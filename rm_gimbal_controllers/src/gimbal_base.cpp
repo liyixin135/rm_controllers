@@ -269,7 +269,15 @@ void Controller::track(const ros::Time& time)
   double yaw_compute = yaw_real;
   double pitch_compute = -pitch_real;
   geometry_msgs::Point target_pos = data_track_.position;
-  geometry_msgs::Vector3 target_vel = data_track_.velocity;
+  geometry_msgs::Vector3 target_vel{};
+  if (data_track_.id == 12)
+  {
+    target_vel.x = 0.;
+    target_vel.y = 0.;
+    target_vel.z = 0.;
+  }
+  else
+    target_vel = data_track_.velocity;
   try
   {
     if (!data_track_.header.frame_id.empty())
@@ -409,9 +417,16 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   {
     geometry_msgs::Point target_pos;
     geometry_msgs::Vector3 target_vel;
-    bullet_solver_->getSelectedArmorPosAndVel(target_pos, target_vel, data_track_.position, data_track_.velocity,
-                                              data_track_.yaw, data_track_.v_yaw, data_track_.radius_1,
-                                              data_track_.radius_2, data_track_.dz, data_track_.armors_num);
+    if (data_track_.id != 12)
+      bullet_solver_->getSelectedArmorPosAndVel(target_pos, target_vel, data_track_.position, data_track_.velocity,
+                                                data_track_.yaw, data_track_.v_yaw, data_track_.radius_1,
+                                                data_track_.radius_2, data_track_.dz, data_track_.armors_num);
+    else
+    {
+      target_pos = data_track_.position;
+      target_vel = data_track_.velocity;
+    }
+
     tf2::Vector3 target_pos_tf, target_vel_tf;
     try
     {
@@ -445,7 +460,7 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
       pid_yaw_pos_state_pub_->msg_.header.stamp = time;
       pid_yaw_pos_state_pub_->msg_.set_point = yaw_des;
       pid_yaw_pos_state_pub_->msg_.process_value = yaw_real;
-      pid_yaw_pos_state_pub_->msg_.process_value_dot = ctrl_yaw_.joint_.getVelocity();
+      pid_yaw_pos_state_pub_->msg_.process_value_dot = yaw_vel_des;
       pid_yaw_pos_state_pub_->msg_.error = yaw_angle_error;
       pid_yaw_pos_state_pub_->msg_.time_step = period.toSec();
       pid_yaw_pos_state_pub_->msg_.command = pid_yaw_pos_.getCurrentCmd();
@@ -461,7 +476,7 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
       pid_pitch_pos_state_pub_->msg_.header.stamp = time;
       pid_pitch_pos_state_pub_->msg_.set_point = pitch_des;
       pid_pitch_pos_state_pub_->msg_.process_value = pitch_real;
-      pid_pitch_pos_state_pub_->msg_.process_value_dot = ctrl_pitch_.joint_.getVelocity();
+      pid_pitch_pos_state_pub_->msg_.process_value_dot = pitch_vel_des;
       pid_pitch_pos_state_pub_->msg_.error = pitch_angle_error;
       pid_pitch_pos_state_pub_->msg_.time_step = period.toSec();
       pid_pitch_pos_state_pub_->msg_.command = pid_pitch_pos_.getCurrentCmd();
@@ -483,7 +498,7 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
                          ctrl_pitch_.joint_.getVelocity() - angular_vel_pitch.y);
   ctrl_yaw_.update(time, period);
   ctrl_pitch_.update(time, period);
-//  ctrl_pitch_.joint_.setCommand(ctrl_pitch_.joint_.getCommand() + feedForward(time));
+  ctrl_pitch_.joint_.setCommand(ctrl_pitch_.joint_.getCommand() + feedForward(time));
 }
 
 double Controller::feedForward(const ros::Time& time)
