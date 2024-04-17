@@ -56,6 +56,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <realtime_tools/realtime_publisher.h>
 #include <rm_common/filters/lp_filter.h>
+#include <rm_common/traj_gen.h>
 
 namespace rm_gimbal_controllers
 {
@@ -199,6 +200,8 @@ private:
   GimbalConfig config_{};
   realtime_tools::RealtimeBuffer<GimbalConfig> config_rt_buffer_;
   dynamic_reconfigure::Server<rm_gimbal_controllers::GimbalBaseConfig>* d_srv_{};
+
+  std::unique_ptr<NonlinearTrackingDifferentiator<double>> yaw_ntd_, pitch_ntd_;
 
   enum
   {
