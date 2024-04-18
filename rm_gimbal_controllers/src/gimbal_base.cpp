@@ -140,6 +140,7 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
   odom2base_.header.frame_id = "odom";
   odom2base_.child_frame_id = yaw_joint_urdf_->parent_link_name;
   odom2base_.transform.rotation.w = 1.;
+  last_odom2gimbal_des_ = odom2gimbal_des_;
 
   cmd_gimbal_sub_ = controller_nh.subscribe<rm_msgs::GimbalCmd>("command", 1, &Controller::commandCB, this);
   data_track_sub_ = controller_nh.subscribe<rm_msgs::TrackData>("/track", 1, &Controller::trackCB, this);
@@ -395,53 +396,83 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
     angular_vel_yaw.z = ctrl_yaw_.joint_.getVelocity();
     angular_vel_pitch.y = ctrl_pitch_.joint_.getVelocity();
   }
-  double roll_real, pitch_real, yaw_real, roll_des, pitch_des, yaw_des;
+  double roll_real, pitch_real, yaw_real, roll_des, pitch_des, yaw_des, last_roll_des, last_pitch_des, last_yaw_des;
   quatToRPY(odom2gimbal_des_.transform.rotation, roll_des, pitch_des, yaw_des);
   quatToRPY(odom2pitch_.transform.rotation, roll_real, pitch_real, yaw_real);
-  yaw_ntd_->update(yaw_des);
-  pitch_ntd_->update(pitch_des);
-  double yaw_angle_error = angles::shortest_angular_distance(yaw_real, yaw_ntd_->getX1());
-  double pitch_angle_error = angles::shortest_angular_distance(pitch_real, pitch_ntd_->getX1());
+  quatToRPY(last_odom2gimbal_des_.transform.rotation, last_roll_des, last_pitch_des, last_yaw_des);
+  last_odom2gimbal_des_ = odom2gimbal_des_;
+
+  double yaw_angle_error, pitch_angle_error;
+  double yaw_vel_des = 0., pitch_vel_des = 0.;
+  if (state_ == RATE)
+  {
+    yaw_vel_des = cmd_gimbal_.rate_yaw;
+    pitch_vel_des = cmd_gimbal_.rate_pitch;
+  }
+  else if (state_ == TRACK)
+  {
+    geometry_msgs::Point target_pos;
+    geometry_msgs::Vector3 target_vel;
+    bullet_solver_->getSelectedArmorPosAndVel(target_pos, target_vel, data_track_.position, data_track_.velocity,
+                                              data_track_.yaw, data_track_.v_yaw, data_track_.radius_1,
+                                              data_track_.radius_2, data_track_.dz, data_track_.armors_num);
+    tf2::Vector3 target_pos_tf, target_vel_tf;
+    try
+    {
+      geometry_msgs::TransformStamped transform = robot_state_handle_.lookupTransform(
+          yaw_joint_urdf_->parent_link_name, data_track_.header.frame_id, data_track_.header.stamp);
+      tf2::doTransform(target_pos, target_pos, transform);
+      tf2::doTransform(target_vel, target_vel, transform);
+      tf2::fromMsg(target_pos, target_pos_tf);
+      tf2::fromMsg(target_vel, target_vel_tf);
+
+      yaw_vel_des = target_pos_tf.cross(target_vel_tf).z() / std::pow((target_pos_tf.length()), 2);
+      transform = robot_state_handle_.lookupTransform(pitch_joint_urdf_->parent_link_name, data_track_.header.frame_id,
+                                                      data_track_.header.stamp);
+      tf2::doTransform(target_pos, target_pos, transform);
+      tf2::doTransform(target_vel, target_vel, transform);
+      tf2::fromMsg(target_pos, target_pos_tf);
+      tf2::fromMsg(target_vel, target_vel_tf);
+      pitch_vel_des = target_pos_tf.cross(target_vel_tf).y() / std::pow((target_pos_tf.length()), 2);
+    }
+    catch (tf2::TransformException& ex)
+    {
+      ROS_WARN("%s", ex.what());
+    }
+  }
+  if (std::abs(angles::shortest_angular_distance(last_yaw_des, yaw_des)) > 0.05)
+  {
+    yaw_des_jump_ = true;
+    yaw_ntd_->clear();
+  }
+  if (std::abs(angles::shortest_angular_distance(yaw_real, yaw_des)) < 0.01 && yaw_des_jump_)
+    yaw_des_jump_ = false;
+  if (yaw_des_jump_)
+  {
+    yaw_ntd_->update(yaw_des);
+    yaw_angle_error = angles::shortest_angular_distance(yaw_real, yaw_ntd_->getX1());
+    yaw_vel_des = yaw_ntd_->getX2();
+  }
+  else
+    yaw_angle_error = angles::shortest_angular_distance(yaw_real, yaw_des);
+  if (std::abs(angles::shortest_angular_distance(last_pitch_des, pitch_des)) > 0.05)
+  {
+    pitch_des_jump_ = true;
+    pitch_ntd_->clear();
+  }
+  if (std::abs(angles::shortest_angular_distance(pitch_real, pitch_des)) < 0.01 && pitch_des_jump_)
+    pitch_des_jump_ = false;
+  if (pitch_des_jump_)
+  {
+    pitch_ntd_->update(pitch_des);
+    pitch_angle_error = angles::shortest_angular_distance(pitch_real, pitch_ntd_->getX1());
+    pitch_vel_des = pitch_ntd_->getX2();
+  }
+  else
+    pitch_angle_error = angles::shortest_angular_distance(pitch_real, pitch_des);
+
   pid_pitch_pos_.computeCommand(pitch_angle_error, period);
   pid_yaw_pos_.computeCommand(yaw_angle_error, period);
-
-  //  double yaw_vel_des = 0., pitch_vel_des = 0.;
-  //  if (state_ == RATE)
-  //  {
-  //    yaw_vel_des = cmd_gimbal_.rate_yaw;
-  //    pitch_vel_des = cmd_gimbal_.rate_pitch;
-  //  }
-  //  else if (state_ == TRACK)
-  //  {
-  //    geometry_msgs::Point target_pos;
-  //    geometry_msgs::Vector3 target_vel;
-  //    bullet_solver_->getSelectedArmorPosAndVel(target_pos, target_vel, data_track_.position, data_track_.velocity,
-  //                                              data_track_.yaw, data_track_.v_yaw, data_track_.radius_1,
-  //                                              data_track_.radius_2, data_track_.dz, data_track_.armors_num);
-  //    tf2::Vector3 target_pos_tf, target_vel_tf;
-  //    try
-  //    {
-  //      geometry_msgs::TransformStamped transform = robot_state_handle_.lookupTransform(
-  //          yaw_joint_urdf_->parent_link_name, data_track_.header.frame_id, data_track_.header.stamp);
-  //      tf2::doTransform(target_pos, target_pos, transform);
-  //      tf2::doTransform(target_vel, target_vel, transform);
-  //      tf2::fromMsg(target_pos, target_pos_tf);
-  //      tf2::fromMsg(target_vel, target_vel_tf);
-  //
-  //      yaw_vel_des = target_pos_tf.cross(target_vel_tf).z() / std::pow((target_pos_tf.length()), 2);
-  //      transform = robot_state_handle_.lookupTransform(pitch_joint_urdf_->parent_link_name, data_track_.header.frame_id,
-  //                                                      data_track_.header.stamp);
-  //      tf2::doTransform(target_pos, target_pos, transform);
-  //      tf2::doTransform(target_vel, target_vel, transform);
-  //      tf2::fromMsg(target_pos, target_pos_tf);
-  //      tf2::fromMsg(target_vel, target_vel_tf);
-  //      pitch_vel_des = target_pos_tf.cross(target_vel_tf).y() / std::pow((target_pos_tf.length()), 2);
-  //    }
-  //    catch (tf2::TransformException& ex)
-  //    {
-  //      ROS_WARN("%s", ex.what());
-  //    }
-  //  }
 
   // publish state
   if (loop_count_ % 10 == 0)
@@ -484,8 +515,8 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
 
   ctrl_yaw_.setCommand(pid_yaw_pos_.getCurrentCmd() -
                        config_.k_chassis_vel_ * chassis_vel_->angular_lp_filter_->output() +
-                       config_.yaw_k_v_ * yaw_ntd_->getX2() + ctrl_yaw_.joint_.getVelocity() - angular_vel_yaw.z);
-  ctrl_pitch_.setCommand(pid_pitch_pos_.getCurrentCmd() + config_.pitch_k_v_ * pitch_ntd_->getX2() +
+                       config_.yaw_k_v_ * yaw_vel_des + ctrl_yaw_.joint_.getVelocity() - angular_vel_yaw.z);
+  ctrl_pitch_.setCommand(pid_pitch_pos_.getCurrentCmd() + config_.pitch_k_v_ * pitch_vel_des +
                          ctrl_pitch_.joint_.getVelocity() - angular_vel_pitch.y);
   ctrl_yaw_.update(time, period);
   ctrl_pitch_.update(time, period);

@@ -202,6 +202,7 @@ private:
   dynamic_reconfigure::Server<rm_gimbal_controllers::GimbalBaseConfig>* d_srv_{};
 
   std::unique_ptr<NonlinearTrackingDifferentiator<double>> yaw_ntd_, pitch_ntd_;
+  bool yaw_des_jump_{}, pitch_des_jump_{};
 
   enum
   {
