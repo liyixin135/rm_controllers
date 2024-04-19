@@ -443,7 +443,7 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   if (std::abs(angles::shortest_angular_distance(last_yaw_des, yaw_des)) > 0.05)
   {
     yaw_des_jump_ = true;
-    yaw_ntd_->clear();
+    yaw_ntd_->clear(last_yaw_des, last_yaw_vel_des_);
   }
   if (std::abs(angles::shortest_angular_distance(yaw_real, yaw_des)) < 0.01 && yaw_des_jump_)
     yaw_des_jump_ = false;
@@ -458,7 +458,7 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   if (std::abs(angles::shortest_angular_distance(last_pitch_des, pitch_des)) > 0.05)
   {
     pitch_des_jump_ = true;
-    pitch_ntd_->clear();
+    pitch_ntd_->clear(last_pitch_des, last_pitch_vel_des_);
   }
   if (std::abs(angles::shortest_angular_distance(pitch_real, pitch_des)) < 0.01 && pitch_des_jump_)
     pitch_des_jump_ = false;
@@ -470,6 +470,8 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   }
   else
     pitch_angle_error = angles::shortest_angular_distance(pitch_real, pitch_des);
+  last_yaw_vel_des_ = yaw_vel_des;
+  last_pitch_vel_des_ = pitch_vel_des;
 
   pid_pitch_pos_.computeCommand(pitch_angle_error, period);
   pid_yaw_pos_.computeCommand(yaw_angle_error, period);
