@@ -146,10 +146,9 @@ bool Controller::init(hardware_interface::RobotHW* robot_hw, ros::NodeHandle& ro
   data_track_sub_ = controller_nh.subscribe<rm_msgs::TrackData>("/track", 1, &Controller::trackCB, this);
   publish_rate_ = getParam(controller_nh, "publish_rate", 100.);
   error_pub_.reset(new realtime_tools::RealtimePublisher<rm_msgs::GimbalDesError>(controller_nh, "error", 100));
-  pid_yaw_pos_state_pub_.reset(
-      new realtime_tools::RealtimePublisher<control_msgs::JointControllerState>(nh_yaw, "pos_state", 1));
+  pid_yaw_pos_state_pub_.reset(new realtime_tools::RealtimePublisher<rm_msgs::GimbalPosState>(nh_yaw, "pos_state", 1));
   pid_pitch_pos_state_pub_.reset(
-      new realtime_tools::RealtimePublisher<control_msgs::JointControllerState>(nh_pitch, "pos_state", 1));
+      new realtime_tools::RealtimePublisher<rm_msgs::GimbalPosState>(nh_pitch, "pos_state", 1));
   return true;
 }
 
@@ -483,33 +482,24 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
     {
       pid_yaw_pos_state_pub_->msg_.header.stamp = time;
       pid_yaw_pos_state_pub_->msg_.set_point = yaw_des;
+      pid_yaw_pos_state_pub_->msg_.td_set_point = yaw_ntd_->getX1();
+      pid_yaw_pos_state_pub_->msg_.td_set_point_dot = yaw_ntd_->getX2();
       pid_yaw_pos_state_pub_->msg_.process_value = yaw_real;
-      pid_yaw_pos_state_pub_->msg_.process_value_dot = ctrl_yaw_.joint_.getVelocity();
+      pid_yaw_pos_state_pub_->msg_.vel_des = yaw_vel_des;
       pid_yaw_pos_state_pub_->msg_.error = angles::shortest_angular_distance(yaw_real, yaw_des);
-      pid_yaw_pos_state_pub_->msg_.time_step = period.toSec();
       pid_yaw_pos_state_pub_->msg_.command = pid_yaw_pos_.getCurrentCmd();
-      double dummy;
-      bool antiwindup;
-      pid_yaw_pos_.getGains(pid_yaw_pos_state_pub_->msg_.p, pid_yaw_pos_state_pub_->msg_.i,
-                            pid_yaw_pos_state_pub_->msg_.d, pid_yaw_pos_state_pub_->msg_.i_clamp, dummy, antiwindup);
-      pid_yaw_pos_state_pub_->msg_.antiwindup = static_cast<char>(antiwindup);
       pid_yaw_pos_state_pub_->unlockAndPublish();
     }
     if (pid_pitch_pos_state_pub_ && pid_pitch_pos_state_pub_->trylock())
     {
       pid_pitch_pos_state_pub_->msg_.header.stamp = time;
       pid_pitch_pos_state_pub_->msg_.set_point = pitch_des;
+      pid_pitch_pos_state_pub_->msg_.td_set_point = pitch_ntd_->getX1();
+      pid_pitch_pos_state_pub_->msg_.td_set_point_dot = pitch_ntd_->getX2();
       pid_pitch_pos_state_pub_->msg_.process_value = pitch_real;
-      pid_pitch_pos_state_pub_->msg_.process_value_dot = ctrl_pitch_.joint_.getVelocity();
+      pid_pitch_pos_state_pub_->msg_.vel_des = pitch_vel_des;
       pid_pitch_pos_state_pub_->msg_.error = angles::shortest_angular_distance(pitch_real, pitch_des);
-      pid_pitch_pos_state_pub_->msg_.time_step = period.toSec();
       pid_pitch_pos_state_pub_->msg_.command = pid_pitch_pos_.getCurrentCmd();
-      double dummy;
-      bool antiwindup;
-      pid_pitch_pos_.getGains(pid_pitch_pos_state_pub_->msg_.p, pid_pitch_pos_state_pub_->msg_.i,
-                              pid_pitch_pos_state_pub_->msg_.d, pid_pitch_pos_state_pub_->msg_.i_clamp, dummy,
-                              antiwindup);
-      pid_pitch_pos_state_pub_->msg_.antiwindup = static_cast<char>(antiwindup);
       pid_pitch_pos_state_pub_->unlockAndPublish();
     }
   }

@@ -47,6 +47,7 @@
 #include <rm_msgs/GimbalCmd.h>
 #include <rm_msgs/TrackData.h>
 #include <rm_msgs/GimbalDesError.h>
+#include <rm_msgs/GimbalPosState.h>
 #include <rm_gimbal_controllers/GimbalBaseConfig.h>
 #include <rm_gimbal_controllers/bullet_solver.h>
 #include <tf2_eigen/tf2_eigen.h>
@@ -62,7 +63,6 @@ namespace rm_gimbal_controllers
 {
 struct GimbalConfig
 {
-  // feedforward
   double yaw_k_v_, pitch_k_v_, k_chassis_vel_;
   double delay;
 };
@@ -169,7 +169,7 @@ private:
 
   // ROS Interface
   ros::Time last_publish_time_{};
-  std::unique_ptr<realtime_tools::RealtimePublisher<control_msgs::JointControllerState>> pid_yaw_pos_state_pub_,
+  std::unique_ptr<realtime_tools::RealtimePublisher<rm_msgs::GimbalPosState>> pid_yaw_pos_state_pub_,
       pid_pitch_pos_state_pub_;
   std::shared_ptr<realtime_tools::RealtimePublisher<rm_msgs::GimbalDesError>> error_pub_;
   ros::Subscriber cmd_gimbal_sub_;
