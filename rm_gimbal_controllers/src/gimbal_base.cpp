@@ -205,7 +205,8 @@ void Controller::setDes(const ros::Time& time, double yaw_des, double pitch_des)
   quatToRPY(toMsg(base2gimbal_des), roll_temp, base2gimbal_current_des_pitch, base2gimbal_current_des_yaw);
   double pitch_real_des, yaw_real_des;
 
-  if (!setDesIntoLimit(pitch_real_des, pitch_des, base2gimbal_current_des_pitch, pitch_joint_urdf_))
+  pitch_des_in_limit = setDesIntoLimit(pitch_real_des, pitch_des, base2gimbal_current_des_pitch, pitch_joint_urdf_);
+  if (!pitch_des_in_limit)
   {
     double yaw_temp;
     tf2::Quaternion base2new_des;
@@ -221,7 +222,8 @@ void Controller::setDes(const ros::Time& time, double yaw_des, double pitch_des)
     quatToRPY(toMsg(odom2base * base2new_des), roll_temp, pitch_real_des, yaw_temp);
   }
 
-  if (!setDesIntoLimit(yaw_real_des, yaw_des, base2gimbal_current_des_yaw, yaw_joint_urdf_))
+  yaw_des_in_limit_ = setDesIntoLimit(yaw_real_des, yaw_des, base2gimbal_current_des_yaw, yaw_joint_urdf_);
+  if (!yaw_des_in_limit_)
   {
     double pitch_temp;
     tf2::Quaternion base2new_des;
@@ -469,6 +471,10 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   }
   else
     pitch_angle_error = angles::shortest_angular_distance(pitch_real, pitch_des);
+  if (!pitch_des_in_limit)
+    pitch_vel_des = 0.;
+  if (!yaw_des_in_limit_)
+    yaw_vel_des = 0.;
   last_yaw_vel_des_ = yaw_vel_des;
   last_pitch_vel_des_ = pitch_vel_des;
 
@@ -506,19 +512,15 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   loop_count_++;
 
   if (state_ == RATE)
-  {
     ctrl_yaw_.setCommand(-config_.k_chassis_vel_ * chassis_vel_->angular_lp_filter_->output() +
                          config_.yaw_k_v_ * yaw_vel_des + ctrl_yaw_.joint_.getVelocity() - angular_vel_yaw.z);
-    ctrl_pitch_.setCommand(config_.pitch_k_v_ * pitch_vel_des + ctrl_pitch_.joint_.getVelocity() - angular_vel_pitch.y);
-  }
   else
-  {
     ctrl_yaw_.setCommand(pid_yaw_pos_.getCurrentCmd() -
                          config_.k_chassis_vel_ * chassis_vel_->angular_lp_filter_->output() +
                          config_.yaw_k_v_ * yaw_vel_des + ctrl_yaw_.joint_.getVelocity() - angular_vel_yaw.z);
-    ctrl_pitch_.setCommand(pid_pitch_pos_.getCurrentCmd() + config_.pitch_k_v_ * pitch_vel_des +
-                           ctrl_pitch_.joint_.getVelocity() - angular_vel_pitch.y);
-  }
+  ctrl_pitch_.setCommand(pid_pitch_pos_.getCurrentCmd() + config_.pitch_k_v_ * pitch_vel_des +
+                         ctrl_pitch_.joint_.getVelocity() - angular_vel_pitch.y);
+
   ctrl_yaw_.update(time, period);
   ctrl_pitch_.update(time, period);
   if (data_track_.id == 12)

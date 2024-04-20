@@ -183,6 +183,7 @@ private:
   std::string gimbal_des_frame_id_{}, imu_name_{};
   double publish_rate_{};
   bool state_changed_{};
+  bool pitch_des_in_limit{}, yaw_des_in_limit_{};
   int loop_count_{};
 
   // Transform
