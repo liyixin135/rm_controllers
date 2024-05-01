@@ -365,7 +365,6 @@ void Controller::direct(const ros::Time& time)
     last_y_ = aim_point_odom.y;
   }
   test_.radius_1 = start_time_.toSec();
-  test_pub_.publish(test_);
 
   setDes(time, yaw, pitch);
 }
@@ -492,10 +491,23 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   }
   loop_count_++;
 
+  if ((ros::Time::now() - start_time_).toSec() <= 0)
+    initial_error_ = angles::shortest_angular_distance(yaw_real, yaw_des);
+  test_.yaw = initial_error_;
   ctrl_yaw_.setCommand(pid_yaw_pos_.getCurrentCmd() - config_.k_chassis_vel_ * chassis_vel_->angular_->z() +
                        config_.yaw_k_v_ * yaw_vel_des + ctrl_yaw_.joint_.getVelocity() - angular_vel_yaw.z);
   ctrl_pitch_.setCommand(pid_pitch_pos_.getCurrentCmd() + config_.pitch_k_v_ * pitch_vel_des +
                          ctrl_pitch_.joint_.getVelocity() - angular_vel_pitch.y);
+  double error = angles::shortest_angular_distance(yaw_real, yaw_des);
+  test_.v_yaw = error;
+  if (std::abs(error) <= std::abs(initial_error_) * 0.02)
+  {
+    over_time_ = ros::Time::now();
+  }
+  test_.radius_2 = over_time_.toSec();
+  double time_error = (over_time_ - start_time_).toSec();
+  test_.dz = time_error;
+  test_pub_.publish(test_);
 
   ctrl_yaw_.update(time, period);
   ctrl_pitch_.update(time, period);

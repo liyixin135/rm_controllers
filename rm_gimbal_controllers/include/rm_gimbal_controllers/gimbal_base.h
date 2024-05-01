@@ -206,11 +206,11 @@ private:
   };
   int state_ = RATE;
 
-  ros::Time start_time_;
-  double last_y_{};
-  ros::NodeHandle controller_nh;
+  ros::Time start_time_, over_time_;
+  double last_y_{}, initial_error_;
+  ros::NodeHandle nh;
   rm_msgs::TrackData test_;
-  ros::Publisher test_pub_ = controller_nh.advertise<rm_msgs::TrackData>("/test", 100);
+  ros::Publisher test_pub_ = nh.advertise<rm_msgs::TrackData>("/test", 100);
 };
 
 }  // namespace rm_gimbal_controllers
