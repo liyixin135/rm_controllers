@@ -359,6 +359,14 @@ void Controller::direct(const ros::Time& time)
   double pitch = -std::atan2(aim_point_odom.z - odom2pitch_.transform.translation.z,
                              std::sqrt(std::pow(aim_point_odom.x - odom2pitch_.transform.translation.x, 2) +
                                        std::pow(aim_point_odom.y - odom2pitch_.transform.translation.y, 2)));
+  if (aim_point_odom.y != last_y_)
+  {
+    start_time_ = ros::Time::now();
+    last_y_ = aim_point_odom.y;
+  }
+  test_.radius_1 = start_time_.toSec();
+  test_pub_.publish(test_);
+
   setDes(time, yaw, pitch);
 }
 
