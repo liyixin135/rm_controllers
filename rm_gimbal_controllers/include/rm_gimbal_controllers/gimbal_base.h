@@ -207,7 +207,7 @@ private:
   int state_ = RATE;
 
   ros::Time start_time_, over_time_;
-  double last_y_{}, initial_error_;
+  double last_y_{}, initial_error_ = 0.;
   ros::NodeHandle nh;
   rm_msgs::TrackData test_;
   ros::Publisher test_pub_ = nh.advertise<rm_msgs::TrackData>("/test", 100);

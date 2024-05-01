@@ -491,7 +491,7 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
   }
   loop_count_++;
 
-  if ((ros::Time::now() - start_time_).toSec() <= 0)
+  if ((ros::Time::now() - start_time_).toSec() <= 0.01)
     initial_error_ = angles::shortest_angular_distance(yaw_real, yaw_des);
   test_.yaw = initial_error_;
   ctrl_yaw_.setCommand(pid_yaw_pos_.getCurrentCmd() - config_.k_chassis_vel_ * chassis_vel_->angular_->z() +
