@@ -211,6 +211,7 @@ private:
   ros::NodeHandle nh;
   rm_msgs::TrackData test_;
   ros::Publisher test_pub_ = nh.advertise<rm_msgs::TrackData>("/test", 100);
+  bool flag_ = false;
 };
 
 }  // namespace rm_gimbal_controllers
