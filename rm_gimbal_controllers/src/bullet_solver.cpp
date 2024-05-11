@@ -187,7 +187,17 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
   {
     target_pos_.x = pos.x - r * cos(atan2(pos.y, pos.x));
     target_pos_.y = pos.y - r * sin(atan2(pos.y, pos.x));
+    if ((v_yaw > 0 &&
+         (yaw + v_yaw * (fly_time_ + config_.delay) + selected_armor_ * 2 * M_PI / armors_num) > output_yaw_) ||
+        (v_yaw < 0 &&
+         (yaw + v_yaw * (fly_time_ + config_.delay) + selected_armor_ * 2 * M_PI / armors_num) < output_yaw_))
+      selected_armor_ = v_yaw > 0. ? -2 : 2;
   }
+  test_.yaw = output_yaw_;
+  test_.v_yaw = v_yaw * (fly_time_ + config_.delay) + selected_armor_ * 2 * M_PI / armors_num;
+  test_.radius_2 = yaw + v_yaw * (fly_time_ + config_.delay) + selected_armor_ * 2 * M_PI / armors_num;
+  test_.radius_1 = selected_armor_;
+  test_pub_.publish(test_);
   target_pos_.z = z;
   while (error >= 0.001)
   {

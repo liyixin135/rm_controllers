@@ -113,5 +113,8 @@ private:
   double fly_time_;
   visualization_msgs::Marker marker_desire_;
   visualization_msgs::Marker marker_real_;
+  ros::NodeHandle nh_;
+  rm_msgs::TrackData test_;
+  ros::Publisher test_pub_ = nh_.advertise<rm_msgs::TrackData>("/test", 5);
 };
 }  // namespace rm_gimbal_controllers
