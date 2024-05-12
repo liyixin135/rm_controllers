@@ -330,7 +330,12 @@ double BulletSolver::getGimbalError(geometry_msgs::Point pos, geometry_msgs::Vec
   double delay = track_target_ ? 0 : config_.delay;
   double r = r1;
   double z = pos.z;
-  if (selected_armor_ != 0)
+  if (selected_armor_ % 2 == 0)
+  {
+    r = armors_num == 4 ? r1 : r2;
+    z = armors_num == 4 ? pos.z : pos.z + dz;
+  }
+  else
   {
     r = armors_num == 4 ? r2 : r1;
     z = armors_num == 4 ? pos.z + dz : pos.z;
