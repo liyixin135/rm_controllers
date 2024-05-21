@@ -137,10 +137,10 @@ bool BulletSolver::solve(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, d
     track_target_ = 1;
   else
     track_target_ = 0;
-  if (std::abs(chassis_angular_z) >= config_.max_chassis_angular_vel && std::abs(v_yaw) > 3)
+  if (std::abs(chassis_angular_z) >= config_.max_chassis_angular_vel && std::abs(v_yaw) > 12.)
     track_target_ = 0;
   double switch_armor_angle;
-  if (std::abs(v_yaw) > 3)
+  if (std::abs(v_yaw) > 12.)
     switch_armor_angle = track_target_ ?
                              (acos(r / target_rho) - max_switch_angle +
                               (-acos(r / target_rho) + (max_switch_angle + min_switch_angle)) * std::abs(v_yaw) /
