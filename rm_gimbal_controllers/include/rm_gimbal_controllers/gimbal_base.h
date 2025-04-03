@@ -48,7 +48,7 @@
 #include <rm_msgs/GimbalDesError.h>
 #include <rm_msgs/GimbalPosState.h>
 #include <rm_gimbal_controllers/GimbalBaseConfig.h>
-#include <rm_gimbal_controllers/bullet_solver.h>
+#include <rm_gimbal_controllers/bullet_solver/solver.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <Eigen/Eigen>
 #include <control_toolbox/pid.h>

@@ -24,7 +24,7 @@ find_package(catkin REQUIRED
         visualization_msgs
         dynamic_reconfigure
         angles
-        )
+)
 
 generate_dynamic_reconfigure_options(
         cfg/BulletSolver.cfg
@@ -68,7 +68,7 @@ include_directories(
 )
 
 ## Declare a cpp library
-add_library(${PROJECT_NAME} src/gimbal_base.cpp src/bullet_solver.cpp)
+add_library(${PROJECT_NAME} src/gimbal_base.cpp src/bullet_solver/solver.cpp)
 
 ## Specify libraries to link executable targets against
 target_link_libraries(${PROJECT_NAME} ${catkin_LIBRARIES})

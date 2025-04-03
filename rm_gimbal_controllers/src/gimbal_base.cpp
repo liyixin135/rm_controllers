@@ -275,24 +275,21 @@ void Controller::track(const ros::Time& time)
   target_vel.x -= chassis_vel_->linear_->x();
   target_vel.y -= chassis_vel_->linear_->y();
   target_vel.z -= chassis_vel_->linear_->z();
-  bool solve_success = bullet_solver_->solve(target_pos, target_vel, cmd_gimbal_.bullet_speed, yaw, data_track_.v_yaw,
-                                             data_track_.radius_1, data_track_.radius_2, data_track_.dz,
-                                             data_track_.armors_num, chassis_vel_->angular_->z());
-  bullet_solver_->judgeShootBeforehand(time, data_track_.v_yaw);
+  bullet_solver_->selectTarget(target_pos, target_vel, cmd_gimbal_.bullet_speed, yaw, data_track_.v_yaw,
+                               data_track_.radius_1, data_track_.radius_2, data_track_.dz);
+  bool solve_success = bullet_solver_->solve();
+  //  bullet_solver_->judgeShootBeforehand(time, data_track_.v_yaw);
 
   if (publish_rate_ > 0.0 && last_publish_time_ + ros::Duration(1.0 / publish_rate_) < time)
   {
     if (error_pub_->trylock())
     {
-      double error =
-          bullet_solver_->getGimbalError(target_pos, target_vel, data_track_.yaw, data_track_.v_yaw,
-                                         data_track_.radius_1, data_track_.radius_2, data_track_.dz,
-                                         data_track_.armors_num, yaw_compute, pitch_compute, cmd_gimbal_.bullet_speed);
+      double error = bullet_solver_->getGimbalError(yaw_compute, pitch_compute);
       error_pub_->msg_.stamp = time;
       error_pub_->msg_.error = solve_success ? error : 1.0;
       error_pub_->unlockAndPublish();
     }
-    bullet_solver_->bulletModelPub(odom2gimbal_, time);
+    //    bullet_solver_->bulletModelPub(odom2gimbal_, time);
     last_publish_time_ = time;
   }
 
