@@ -74,8 +74,7 @@ public:
   }
   geometry_msgs::Vector3 velocity(double /*time*/) override
   {
-    geometry_msgs::Vector3 target_vel;
-    return target_vel;
+    return vel_;
   }
 };
 }  // namespace rm_gimbal_controllers
