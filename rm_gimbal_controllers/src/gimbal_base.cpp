@@ -431,9 +431,7 @@ void Controller::moveJoint(const ros::Time& time, const ros::Duration& period)
     geometry_msgs::Point target_pos;
     geometry_msgs::Vector3 target_vel;
     if (data_track_.id != 12)
-      bullet_solver_->getSelectedArmorPosAndVel(target_pos, target_vel, data_track_.position, data_track_.velocity,
-                                                data_track_.yaw, data_track_.v_yaw, data_track_.radius_1,
-                                                data_track_.radius_2, data_track_.dz, data_track_.armors_num);
+      bullet_solver_->getSelectedArmorPosAndVel(target_pos, target_vel);
     else
     {
       target_pos = data_track_.position;

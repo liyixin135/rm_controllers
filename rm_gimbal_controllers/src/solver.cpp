@@ -130,9 +130,7 @@ double BulletSolver::getGimbalError(double yaw_real, double pitch_real)
   return error;
 }
 
-void BulletSolver::getSelectedArmorPosAndVel(geometry_msgs::Point& armor_pos, geometry_msgs::Vector3& armor_vel,
-                                             geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double yaw,
-                                             double v_yaw, double r1, double r2, double dz, int armors_num)
+void BulletSolver::getSelectedArmorPosAndVel(geometry_msgs::Point& armor_pos, geometry_msgs::Vector3& armor_vel)
 {
   if (track_target_)
   {
@@ -142,7 +140,7 @@ void BulletSolver::getSelectedArmorPosAndVel(geometry_msgs::Point& armor_pos, ge
   else
   {
     armor_pos = untracked_target_kinematic_->position(0.);
-    armor_vel = vel;
+    armor_vel = untracked_target_kinematic_->velocity(0.);
   }
 }
 

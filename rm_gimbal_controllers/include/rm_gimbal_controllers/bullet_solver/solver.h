@@ -40,9 +40,7 @@ public:
   }
   double getResistanceCoefficient(double bullet_speed) const;
   double getGimbalError(double yaw_real, double pitch_real);
-  void getSelectedArmorPosAndVel(geometry_msgs::Point& armor_pos, geometry_msgs::Vector3& armor_vel,
-                                 geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double yaw, double v_yaw,
-                                 double r1, double r2, double dz, int armors_num);
+  void getSelectedArmorPosAndVel(geometry_msgs::Point& armor_pos, geometry_msgs::Vector3& armor_vel);
   void publishState();
   void reconfigCB(rm_gimbal_controllers::BulletSolverConfig& config, uint32_t);
   ~BulletSolver() = default;
