@@ -44,6 +44,7 @@ BulletSolver::BulletSolver(ros::NodeHandle& controller_nh)
 void BulletSolver::selectTarget(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double bullet_speed, double yaw,
                                 double v_yaw, double r1, double r2, double dz)
 {
+  config_ = *config_rt_buffer_.readFromRT();
   bullet_speed_ = bullet_speed;
   resistance_coff_ = getResistanceCoefficient(bullet_speed_) != 0 ? getResistanceCoefficient(bullet_speed_) : 0.001;
   target_selector_->reset(pos, vel, yaw, v_yaw, r1, r2, bullet_speed, resistance_coff_, config_.max_track_target_vel);
