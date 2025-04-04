@@ -8,6 +8,7 @@
 #include <realtime_tools/realtime_buffer.h>
 #include <dynamic_reconfigure/server.h>
 #include <rm_common/ros_utilities.h>
+#include <rm_msgs/BulletSolverState.h>
 #include <rm_gimbal_controllers/BulletSolverConfig.h>
 #include "rm_gimbal_controllers/bullet_solver/target_kinematics.h"
 #include "rm_gimbal_controllers/bullet_solver/selector.h"
@@ -42,6 +43,7 @@ public:
   void getSelectedArmorPosAndVel(geometry_msgs::Point& armor_pos, geometry_msgs::Vector3& armor_vel,
                                  geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double yaw, double v_yaw,
                                  double r1, double r2, double dz, int armors_num);
+  void publishState();
   void reconfigCB(rm_gimbal_controllers::BulletSolverConfig& config, uint32_t);
   ~BulletSolver() = default;
 
@@ -49,6 +51,7 @@ private:
   std::unique_ptr<TrackedTargetKinematic> tracked_target_kinematic_;
   std::unique_ptr<UntrackedTargetKinematic> untracked_target_kinematic_;
   std::unique_ptr<TargetSelector> target_selector_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<rm_msgs::BulletSolverState>> state_pub_;
   geometry_msgs::Point target_pos_{};
   realtime_tools::RealtimeBuffer<Config> config_rt_buffer_;
   dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>* d_srv_{};
@@ -57,5 +60,6 @@ private:
   bool track_target_{};
   double output_yaw_{}, output_pitch_{};
   double bullet_speed_{}, resistance_coff_{}, fly_time_{};
+  int current_armor_{};
 };
 }  // namespace rm_gimbal_controllers

@@ -39,6 +39,8 @@ BulletSolver::BulletSolver(ros::NodeHandle& controller_nh)
   tracked_target_kinematic_ = std::make_unique<TrackedTargetKinematic>();
   untracked_target_kinematic_ = std::make_unique<UntrackedTargetKinematic>();
   target_selector_ = std::make_unique<TargetSelector>();
+  state_pub_ = std::make_unique<realtime_tools::RealtimePublisher<rm_msgs::BulletSolverState>>(
+      controller_nh, "bullet_solver_state", 10.);
 }
 
 void BulletSolver::selectTarget(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double bullet_speed, double yaw,
@@ -49,10 +51,10 @@ void BulletSolver::selectTarget(geometry_msgs::Point pos, geometry_msgs::Vector3
   resistance_coff_ = getResistanceCoefficient(bullet_speed_) != 0 ? getResistanceCoefficient(bullet_speed_) : 0.001;
   target_selector_->reset(pos, vel, yaw, v_yaw, r1, r2, bullet_speed, resistance_coff_, config_.max_track_target_vel,
                           config_.delay);
-  const int armor = target_selector_->getArmor();
-  double r = (armor == FRONT || armor == BACK) ? r1 : r2;
-  yaw += (M_PI / 2) * (armor - 1);
-  if (armor == LEFT || armor == RIGHT)
+  current_armor_ = target_selector_->getArmor();
+  double r = (current_armor_ == FRONT || current_armor_ == BACK) ? r1 : r2;
+  yaw += (M_PI / 2) * (current_armor_ - 1);
+  if (current_armor_ == LEFT || current_armor_ == RIGHT)
     pos.z += dz;
   if (std::abs(v_yaw) < config_.max_track_target_vel)
   {
@@ -159,6 +161,16 @@ double BulletSolver::getResistanceCoefficient(double bullet_speed) const
   else
     resistance_coff = config_.resistance_coff_qd_30;
   return resistance_coff;
+}
+
+void BulletSolver::publishState()
+{
+  if (state_pub_->trylock())
+  {
+    state_pub_->msg_.fly_time = fly_time_;
+    state_pub_->msg_.current_armor = current_armor_;
+    state_pub_->unlockAndPublish();
+  }
 }
 
 void BulletSolver::reconfigCB(rm_gimbal_controllers::BulletSolverConfig& config, uint32_t /*unused*/)

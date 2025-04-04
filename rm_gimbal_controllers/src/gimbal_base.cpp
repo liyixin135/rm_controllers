@@ -289,7 +289,7 @@ void Controller::track(const ros::Time& time)
       error_pub_->msg_.error = solve_success ? error : 1.0;
       error_pub_->unlockAndPublish();
     }
-    //    bullet_solver_->bulletModelPub(odom2gimbal_, time);
+    bullet_solver_->publishState();
     last_publish_time_ = time;
   }
 
