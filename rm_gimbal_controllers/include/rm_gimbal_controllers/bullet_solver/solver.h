@@ -9,6 +9,7 @@
 #include <dynamic_reconfigure/server.h>
 #include <rm_common/ros_utilities.h>
 #include <rm_msgs/BulletSolverState.h>
+#include <rm_msgs/ShootBeforehandCmd.h>
 #include <rm_gimbal_controllers/BulletSolverConfig.h>
 #include "rm_gimbal_controllers/bullet_solver/target_kinematics.h"
 #include "rm_gimbal_controllers/bullet_solver/selector.h"
@@ -42,6 +43,7 @@ public:
   double getGimbalError(double yaw_real, double pitch_real);
   void getSelectedArmorPosAndVel(geometry_msgs::Point& armor_pos, geometry_msgs::Vector3& armor_vel);
   void publishState();
+  void judgeShootBeforehand(const ros::Time& time, double v_yaw);
   void reconfigCB(rm_gimbal_controllers::BulletSolverConfig& config, uint32_t);
   ~BulletSolver() = default;
 
@@ -50,10 +52,12 @@ private:
   std::unique_ptr<UntrackedTargetKinematic> untracked_target_kinematic_;
   std::unique_ptr<TargetSelector> target_selector_;
   std::unique_ptr<realtime_tools::RealtimePublisher<rm_msgs::BulletSolverState>> state_pub_;
+  std::unique_ptr<realtime_tools::RealtimePublisher<rm_msgs::ShootBeforehandCmd>> shoot_beforehand_cmd_pub_;
   geometry_msgs::Point target_pos_{};
   realtime_tools::RealtimeBuffer<Config> config_rt_buffer_;
   dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>* d_srv_{};
   Config config_{};
+  ros::Time switch_armor_time_{};
   bool dynamic_reconfig_initialized_{};
   bool track_target_{};
   double output_yaw_{}, output_pitch_{};

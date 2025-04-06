@@ -278,7 +278,7 @@ void Controller::track(const ros::Time& time)
   bullet_solver_->selectTarget(target_pos, target_vel, cmd_gimbal_.bullet_speed, yaw, data_track_.v_yaw,
                                data_track_.radius_1, data_track_.radius_2, data_track_.dz);
   bool solve_success = bullet_solver_->solve();
-  //  bullet_solver_->judgeShootBeforehand(time, data_track_.v_yaw);
+  bullet_solver_->judgeShootBeforehand(time, data_track_.v_yaw);
 
   if (publish_rate_ > 0.0 && last_publish_time_ + ros::Duration(1.0 / publish_rate_) < time)
   {

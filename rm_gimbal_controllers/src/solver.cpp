@@ -51,6 +51,8 @@ void BulletSolver::selectTarget(geometry_msgs::Point pos, geometry_msgs::Vector3
   resistance_coff_ = getResistanceCoefficient(bullet_speed_) != 0 ? getResistanceCoefficient(bullet_speed_) : 0.001;
   target_selector_->reset(pos, vel, yaw, v_yaw, r1, r2, bullet_speed, resistance_coff_, config_.max_track_target_vel,
                           config_.delay);
+  if (current_armor_ == FRONT && target_selector_->getArmor() != FRONT)
+    switch_armor_time_ = ros::Time::now();
   current_armor_ = target_selector_->getArmor();
   double r = (current_armor_ == FRONT || current_armor_ == BACK) ? r1 : r2;
   yaw += (M_PI / 2) * (current_armor_ - 1);
@@ -168,6 +170,28 @@ void BulletSolver::publishState()
     state_pub_->msg_.fly_time = fly_time_;
     state_pub_->msg_.current_armor = current_armor_;
     state_pub_->unlockAndPublish();
+  }
+}
+
+void BulletSolver::judgeShootBeforehand(const ros::Time& time, double v_yaw)
+{
+  int shoot_beforehand_cmd{};
+  if (!track_target_)
+    shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::JUDGE_BY_ERROR;
+  else if ((ros::Time::now() - switch_armor_time_).toSec() < ros::Duration(config_.ban_shoot_duration).toSec())
+    shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::BAN_SHOOT;
+  else if (((ros::Time::now() - switch_armor_time_).toSec() < ros::Duration(config_.gimbal_switch_duration).toSec()) &&
+           std::abs(v_yaw) > config_.min_shoot_beforehand_vel)
+    shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::ALLOW_SHOOT;
+  //  else if (is_in_delay_before_switch_)
+  //    shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::BAN_SHOOT;
+  else
+    shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::JUDGE_BY_ERROR;
+  if (shoot_beforehand_cmd_pub_->trylock())
+  {
+    shoot_beforehand_cmd_pub_->msg_.stamp = time;
+    shoot_beforehand_cmd_pub_->msg_.cmd = shoot_beforehand_cmd;
+    shoot_beforehand_cmd_pub_->unlockAndPublish();
   }
 }
 
