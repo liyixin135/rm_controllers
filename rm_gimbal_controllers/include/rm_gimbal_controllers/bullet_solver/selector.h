@@ -31,6 +31,7 @@ public:
     bullet_speed_ = bullet_speed;
     resistance_coff_ = resistance_coff;
     max_track_target_vel_ = max_track_target_vel;
+    delay_ = delay;
   }
   int getArmor()
   {
