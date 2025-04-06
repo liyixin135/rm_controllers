@@ -49,6 +49,12 @@ public:
                                     min_switch_angle;
     if (v_yaw_ < max_track_target_vel_)
     {
+      if (((((yaw_ + v_yaw_ * (rough_fly_time + delay_)) > output_yaw + switch_armor_angle) && v_yaw_ > 0.) ||
+           (((yaw_ + v_yaw_ * (rough_fly_time + delay_)) < output_yaw - switch_armor_angle) && v_yaw_ < 0.)) &&
+          std::abs(v_yaw_) >= 1.0)
+        ready_switch_armor_ = true;
+      else
+        ready_switch_armor_ = false;
       if (((((yaw_ + v_yaw_ * rough_fly_time) > output_yaw + switch_armor_angle) && v_yaw_ > 0.) ||
            (((yaw_ + v_yaw_ * rough_fly_time) < output_yaw - switch_armor_angle) && v_yaw_ < 0.)) &&
           std::abs(v_yaw_) >= 1.0)
@@ -88,10 +94,16 @@ public:
     }
   }
 
+  bool getReadySwitchArmorState()
+  {
+    return ready_switch_armor_;
+  }
+
 private:
   geometry_msgs::Point pos_;
   geometry_msgs::Vector3 vel_;
   double bullet_speed_{}, yaw_{}, v_yaw_{}, r1_{}, r2_{}, resistance_coff_{};
   double max_track_target_vel_{}, delay_{};
+  bool ready_switch_armor_{};
 };
 }  // namespace rm_gimbal_controllers
