@@ -51,8 +51,11 @@ void BulletSolver::selectTarget(geometry_msgs::Point pos, geometry_msgs::Vector3
   resistance_coff_ = getResistanceCoefficient(bullet_speed_) != 0 ? getResistanceCoefficient(bullet_speed_) : 0.001;
   target_selector_->reset(pos, vel, yaw, v_yaw, r1, r2, bullet_speed, resistance_coff_, config_.max_track_target_vel,
                           config_.delay, armors_num);
+  if (current_switch_state_ == NO_SWITCH && target_selector_->getSwitchArmorState() == READY_SWITCH)
+    ready_switch_armor_time_ = ros::Time::now();
   if (target_selector_->getSwitchArmorState() == START_SWITCH)
     switch_armor_time_ = ros::Time::now();
+  current_switch_state_ = target_selector_->getSwitchArmorState();
   target_armor_ = target_selector_->getTargetArmor();
   double r = (target_armor_ == FRONT || target_armor_ == BACK) ? r1 : r2;
   yaw += (M_PI * 2 / armors_num) * (target_armor_ - 1);
@@ -178,13 +181,13 @@ void BulletSolver::judgeShootBeforehand(const ros::Time& time, double v_yaw)
   int shoot_beforehand_cmd{};
   if (!track_target_)
     shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::JUDGE_BY_ERROR;
-  else if ((ros::Time::now() - switch_armor_time_).toSec() < ros::Duration(config_.ban_shoot_duration).toSec())
+  else if (target_selector_->getSwitchArmorState() == READY_SWITCH &&
+           (ros::Time::now() - ready_switch_armor_time_).toSec() < config_.gimbal_switch_duration)
     shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::BAN_SHOOT;
-  else if (((ros::Time::now() - switch_armor_time_).toSec() < ros::Duration(config_.gimbal_switch_duration).toSec()) &&
-           std::abs(v_yaw) > config_.min_shoot_beforehand_vel)
+  else if ((ros::Time::now() - switch_armor_time_).toSec() < config_.gimbal_switch_duration - config_.delay)
+    shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::BAN_SHOOT;
+  else if (((ros::Time::now() - switch_armor_time_).toSec() < config_.gimbal_switch_duration))
     shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::ALLOW_SHOOT;
-  else if (target_selector_->getSwitchArmorState() == READY_SWITCH)
-    shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::BAN_SHOOT;
   else
     shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::JUDGE_BY_ERROR;
   if (shoot_beforehand_cmd_pub_->trylock())
