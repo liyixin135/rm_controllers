@@ -56,14 +56,14 @@ public:
                                     min_switch_angle;
     if (v_yaw_ < max_track_target_vel_)
     {
-      if (((((yaw_ + (M_PI * 2 / armors_num_) * (current_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) >
-             output_yaw + switch_armor_angle) &&
-            v_yaw_ > 0.) ||
-           (((yaw_ + (M_PI * 2 / armors_num_) * (current_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) <
-             output_yaw - switch_armor_angle) &&
-            v_yaw_ < 0.)) &&
-          std::abs(v_yaw_) >= 1.0)
-        switch_armor_state_ = READY_SWITCH;
+      //      if (((((yaw_ + (M_PI * 2 / armors_num_) * (current_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) >
+      //             output_yaw + switch_armor_angle) &&
+      //            v_yaw_ > 0.) ||
+      //           (((yaw_ + (M_PI * 2 / armors_num_) * (current_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) <
+      //             output_yaw - switch_armor_angle) &&
+      //            v_yaw_ < 0.)) &&
+      //          std::abs(v_yaw_) >= 1.0)
+      //        switch_armor_state_ = READY_SWITCH;
       if (((((yaw_ + v_yaw_ * rough_fly_time) > output_yaw + switch_armor_angle) && v_yaw_ > 0.) ||
            (((yaw_ + v_yaw_ * rough_fly_time) < output_yaw - switch_armor_angle) && v_yaw_ < 0.)) &&
           std::abs(v_yaw_) >= 1.0)
@@ -108,7 +108,7 @@ public:
     if ((current_armor_ == FRONT && target_armor_ != FRONT) ||
         ((current_armor_ == LEFT || current_armor_ == RIGHT) && target_armor_ == BACK))
       switch_armor_state_ = START_SWITCH;
-    else
+    else if (switch_armor_state_ != READY_SWITCH)
       switch_armor_state_ = NO_SWITCH;
     current_armor_ = target_armor_;
     return target_armor_;
