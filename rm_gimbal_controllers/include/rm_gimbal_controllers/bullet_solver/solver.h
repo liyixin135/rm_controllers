@@ -62,6 +62,6 @@ private:
   bool track_target_{};
   double output_yaw_{}, output_pitch_{};
   double bullet_speed_{}, resistance_coff_{}, fly_time_{};
-  int current_armor_{};
+  int target_armor_{};
 };
 }  // namespace rm_gimbal_controllers

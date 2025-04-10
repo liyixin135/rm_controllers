@@ -15,6 +15,12 @@ enum Armor
   RIGHT,
   BACK,
 };
+enum SwitchArmorState
+{
+  NO_SWITCH = 0,
+  READY_SWITCH,
+  START_SWITCH,
+};
 class TargetSelector
 {
 public:
@@ -33,7 +39,7 @@ public:
     max_track_target_vel_ = max_track_target_vel;
     delay_ = delay;
   }
-  int getArmor()
+  int getTargetArmor()
   {
     double target_rho = std::sqrt(std::pow(pos_.x, 2) + std::pow(pos_.y, 2));
     double output_yaw = std::atan2(pos_.y, pos_.x);
@@ -49,12 +55,14 @@ public:
                                     min_switch_angle;
     if (v_yaw_ < max_track_target_vel_)
     {
-      if (((((yaw_ + v_yaw_ * (rough_fly_time + delay_)) > output_yaw + switch_armor_angle) && v_yaw_ > 0.) ||
-           (((yaw_ + v_yaw_ * (rough_fly_time + delay_)) < output_yaw - switch_armor_angle) && v_yaw_ < 0.)) &&
+      if (((((yaw_ + (M_PI / 2) * (current_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) >
+             output_yaw + switch_armor_angle) &&
+            v_yaw_ > 0.) ||
+           (((yaw_ + (M_PI / 2) * (current_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) <
+             output_yaw - switch_armor_angle) &&
+            v_yaw_ < 0.)) &&
           std::abs(v_yaw_) >= 1.0)
-        ready_switch_armor_ = true;
-      else
-        ready_switch_armor_ = false;
+        switch_armor_state_ = READY_SWITCH;
       if (((((yaw_ + v_yaw_ * rough_fly_time) > output_yaw + switch_armor_angle) && v_yaw_ > 0.) ||
            (((yaw_ + v_yaw_ * rough_fly_time) < output_yaw - switch_armor_angle) && v_yaw_ < 0.)) &&
           std::abs(v_yaw_) >= 1.0)
@@ -67,12 +75,12 @@ public:
         if (((((yaw_ - M_PI / 2 + v_yaw_ * rough_fly_time) > output_yaw + next_switch_armor_angle) && v_yaw_ > 0.) ||
              (((yaw_ + M_PI / 2 + v_yaw_ * rough_fly_time) < output_yaw - next_switch_armor_angle) && v_yaw_ < 0.)) &&
             std::abs(v_yaw_) >= 1.0)
-          return BACK;
+          target_armor_ = BACK;
         else
-          return v_yaw_ > 0. ? LEFT : RIGHT;
+          target_armor_ = v_yaw_ > 0. ? LEFT : RIGHT;
       }
       else
-        return FRONT;
+        target_armor_ = FRONT;
     }
     else
     {
@@ -85,18 +93,25 @@ public:
              (((yaw_ + M_PI / 2 + v_yaw_ * (rough_fly_time + delay_)) < output_yaw - switch_armor_angle) &&
               v_yaw_ < 0.)) &&
             std::abs(v_yaw_) >= 1.0)
-          return BACK;
+          target_armor_ = BACK;
         else
-          return v_yaw_ > 0. ? LEFT : RIGHT;
+          target_armor_ = v_yaw_ > 0. ? LEFT : RIGHT;
       }
       else
-        return FRONT;
+        target_armor_ = FRONT;
     }
+    if ((current_armor_ == FRONT && target_armor_ != FRONT) ||
+        ((current_armor_ == LEFT || current_armor_ == RIGHT) && target_armor_ == BACK))
+      switch_armor_state_ = START_SWITCH;
+    else
+      switch_armor_state_ = NO_SWITCH;
+    current_armor_ = target_armor_;
+    return target_armor_;
   }
 
-  bool getReadySwitchArmorState()
+  int getSwitchArmorState()
   {
-    return ready_switch_armor_;
+    return switch_armor_state_;
   }
 
 private:
@@ -104,6 +119,7 @@ private:
   geometry_msgs::Vector3 vel_;
   double bullet_speed_{}, yaw_{}, v_yaw_{}, r1_{}, r2_{}, resistance_coff_{};
   double max_track_target_vel_{}, delay_{};
-  bool ready_switch_armor_{};
+  int current_armor_{ 1 }, target_armor_{ 1 };
+  int switch_armor_state_{ 0 };
 };
 }  // namespace rm_gimbal_controllers
