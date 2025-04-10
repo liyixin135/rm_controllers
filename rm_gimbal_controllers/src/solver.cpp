@@ -44,18 +44,18 @@ BulletSolver::BulletSolver(ros::NodeHandle& controller_nh)
 }
 
 void BulletSolver::selectTarget(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double bullet_speed, double yaw,
-                                double v_yaw, double r1, double r2, double dz)
+                                double v_yaw, double r1, double r2, double dz, int armors_num)
 {
   config_ = *config_rt_buffer_.readFromRT();
   bullet_speed_ = bullet_speed;
   resistance_coff_ = getResistanceCoefficient(bullet_speed_) != 0 ? getResistanceCoefficient(bullet_speed_) : 0.001;
   target_selector_->reset(pos, vel, yaw, v_yaw, r1, r2, bullet_speed, resistance_coff_, config_.max_track_target_vel,
-                          config_.delay);
+                          config_.delay, armors_num);
   if (target_selector_->getSwitchArmorState() == START_SWITCH)
     switch_armor_time_ = ros::Time::now();
   target_armor_ = target_selector_->getTargetArmor();
   double r = (target_armor_ == FRONT || target_armor_ == BACK) ? r1 : r2;
-  yaw += (M_PI / 2) * (target_armor_ - 1);
+  yaw += (M_PI * 2 / armors_num) * (target_armor_ - 1);
   if (target_armor_ == LEFT || target_armor_ == RIGHT)
     pos.z += dz;
   if (std::abs(v_yaw) < config_.max_track_target_vel)

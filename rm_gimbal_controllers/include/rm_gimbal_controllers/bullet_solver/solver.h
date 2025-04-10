@@ -29,7 +29,7 @@ class BulletSolver
 public:
   explicit BulletSolver(ros::NodeHandle& controller_nh);
   void selectTarget(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double bullet_speed, double yaw, double v_yaw,
-                    double r1, double r2, double dz);
+                    double r1, double r2, double dz, int armors_num);
   bool solve();
   double getYaw() const
   {

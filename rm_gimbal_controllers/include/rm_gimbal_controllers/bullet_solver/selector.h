@@ -26,7 +26,7 @@ class TargetSelector
 public:
   TargetSelector() = default;
   void reset(geometry_msgs::Point pos, geometry_msgs::Vector3 vel, double yaw, double v_yaw, double r1, double r2,
-             double bullet_speed, double resistance_coff, double max_track_target_vel, double delay)
+             double bullet_speed, double resistance_coff, double max_track_target_vel, double delay, int armors_num)
   {
     pos_ = pos;
     vel_ = vel;
@@ -34,10 +34,11 @@ public:
     v_yaw_ = v_yaw;
     r1_ = r1;
     r2_ = r2;
+    armors_num_ = armors_num;
+    delay_ = delay;
     bullet_speed_ = bullet_speed;
     resistance_coff_ = resistance_coff;
     max_track_target_vel_ = max_track_target_vel;
-    delay_ = delay;
   }
   int getTargetArmor()
   {
@@ -55,10 +56,10 @@ public:
                                     min_switch_angle;
     if (v_yaw_ < max_track_target_vel_)
     {
-      if (((((yaw_ + (M_PI / 2) * (current_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) >
+      if (((((yaw_ + (M_PI * 2 / armors_num_) * (current_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) >
              output_yaw + switch_armor_angle) &&
             v_yaw_ > 0.) ||
-           (((yaw_ + (M_PI / 2) * (current_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) <
+           (((yaw_ + (M_PI * 2 / armors_num_) * (current_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) <
              output_yaw - switch_armor_angle) &&
             v_yaw_ < 0.)) &&
           std::abs(v_yaw_) >= 1.0)
@@ -72,8 +73,10 @@ public:
                                               (-acos(r2_ / target_rho) + (max_switch_angle + min_switch_angle)) *
                                                   std::abs(v_yaw_) / max_track_target_vel_) :
                                              min_switch_angle;
-        if (((((yaw_ - M_PI / 2 + v_yaw_ * rough_fly_time) > output_yaw + next_switch_armor_angle) && v_yaw_ > 0.) ||
-             (((yaw_ + M_PI / 2 + v_yaw_ * rough_fly_time) < output_yaw - next_switch_armor_angle) && v_yaw_ < 0.)) &&
+        if (((((yaw_ - (M_PI * 2 / armors_num_) + v_yaw_ * rough_fly_time) > output_yaw + next_switch_armor_angle) &&
+              v_yaw_ > 0.) ||
+             (((yaw_ + (M_PI * 2 / armors_num_) + v_yaw_ * rough_fly_time) < output_yaw - next_switch_armor_angle) &&
+              v_yaw_ < 0.)) &&
             std::abs(v_yaw_) >= 1.0)
           target_armor_ = BACK;
         else
@@ -88,9 +91,11 @@ public:
            (((yaw_ + v_yaw_ * (rough_fly_time + delay_)) < output_yaw - switch_armor_angle) && v_yaw_ < 0.)) &&
           std::abs(v_yaw_) >= 1.0)
       {
-        if (((((yaw_ - M_PI / 2 + v_yaw_ * (rough_fly_time + delay_)) > output_yaw + switch_armor_angle) &&
+        if (((((yaw_ - (M_PI * 2 / armors_num_) + v_yaw_ * (rough_fly_time + delay_)) >
+               output_yaw + switch_armor_angle) &&
               v_yaw_ > 0.) ||
-             (((yaw_ + M_PI / 2 + v_yaw_ * (rough_fly_time + delay_)) < output_yaw - switch_armor_angle) &&
+             (((yaw_ + (M_PI * 2 / armors_num_) + v_yaw_ * (rough_fly_time + delay_)) <
+               output_yaw - switch_armor_angle) &&
               v_yaw_ < 0.)) &&
             std::abs(v_yaw_) >= 1.0)
           target_armor_ = BACK;
@@ -117,9 +122,10 @@ public:
 private:
   geometry_msgs::Point pos_;
   geometry_msgs::Vector3 vel_;
-  double bullet_speed_{}, yaw_{}, v_yaw_{}, r1_{}, r2_{}, resistance_coff_{};
-  double max_track_target_vel_{}, delay_{};
+  double yaw_{}, v_yaw_{}, r1_{}, r2_{};
+  double delay_{}, bullet_speed_{}, resistance_coff_{}, max_track_target_vel_{};
   int current_armor_{ 1 }, target_armor_{ 1 };
   int switch_armor_state_{ 0 };
+  int armors_num_{};
 };
 }  // namespace rm_gimbal_controllers
