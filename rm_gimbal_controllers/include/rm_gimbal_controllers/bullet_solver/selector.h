@@ -77,10 +77,10 @@ public:
       else
         target_armor_ = FRONT;
 
-      if (((((yaw_ + (M_PI * 2 / armors_num_) * (target_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) >
+      if (((((yaw_ + (M_PI * 2 / armors_num_) * (target_armor_ - 1) + v_yaw_ * delay_) >
              output_yaw + switch_armor_angle) &&
             v_yaw_ > 0.) ||
-           (((yaw_ + (M_PI * 2 / armors_num_) * (target_armor_ - 1) + v_yaw_ * (rough_fly_time + delay_)) <
+           (((yaw_ + (M_PI * 2 / armors_num_) * (target_armor_ - 1) + v_yaw_ * delay_) <
              output_yaw - switch_armor_angle) &&
             v_yaw_ < 0.)) &&
           std::abs(v_yaw_) >= 1.0)
