@@ -49,13 +49,19 @@ void BulletSolver::selectTarget(geometry_msgs::Point pos, geometry_msgs::Vector3
   config_ = *config_rt_buffer_.readFromRT();
   bullet_speed_ = bullet_speed;
   resistance_coff_ = getResistanceCoefficient(bullet_speed_) != 0 ? getResistanceCoefficient(bullet_speed_) : 0.001;
+  // 将全局变量所都赋值进去
   target_selector_->reset(pos, vel, yaw, v_yaw, r1, r2, bullet_speed, resistance_coff_, config_.max_track_target_vel,
                           config_.delay, armors_num);
+  // current_switch_state_是int类型,后面那个东西是切换装甲板的状态，noswitch,readyswitch,startswitch
+  // 当前状态是没有切换，获取状态是准备切换，准备切换时间更新
   if (current_switch_state_ == NO_SWITCH && target_selector_->getSwitchArmorState() == READY_SWITCH)
     ready_switch_armor_time_ = ros::Time::now();
+  // 获取状态是开始切换，切换时间更新
   if (target_selector_->getSwitchArmorState() == START_SWITCH)
     switch_armor_time_ = ros::Time::now();
+  // 更新当前状态
   current_switch_state_ = target_selector_->getSwitchArmorState();
+  // 获取当前跟随装甲板
   target_armor_ = target_selector_->getTargetArmor();
   double r = (target_armor_ == FRONT || target_armor_ == BACK) ? r1 : r2;
   yaw += (M_PI * 2 / armors_num) * (target_armor_ - 1);

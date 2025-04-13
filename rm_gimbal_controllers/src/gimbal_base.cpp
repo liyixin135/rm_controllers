@@ -275,6 +275,7 @@ void Controller::track(const ros::Time& time)
   target_vel.x -= chassis_vel_->linear_->x();
   target_vel.y -= chassis_vel_->linear_->y();
   target_vel.z -= chassis_vel_->linear_->z();
+  // 选择装甲板
   bullet_solver_->selectTarget(target_pos, target_vel, cmd_gimbal_.bullet_speed, yaw, data_track_.v_yaw,
                                data_track_.radius_1, data_track_.radius_2, data_track_.dz, data_track_.armors_num);
   bool solve_success = bullet_solver_->solve();
