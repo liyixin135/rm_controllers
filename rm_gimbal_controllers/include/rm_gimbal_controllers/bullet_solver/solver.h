@@ -8,6 +8,7 @@
 #include <realtime_tools/realtime_buffer.h>
 #include <dynamic_reconfigure/server.h>
 #include <rm_common/ros_utilities.h>
+#include <rm_common/linear_interpolation.h>
 #include <rm_msgs/BulletSolverState.h>
 #include <rm_msgs/ShootBeforehandCmd.h>
 #include <rm_gimbal_controllers/BulletSolverConfig.h>
@@ -58,6 +59,7 @@ private:
   dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>* d_srv_{};
   Config config_{};
   ros::Time switch_armor_time_{}, ready_switch_armor_time_{};
+  rm_common::LinearInterp gimbal_switch_duration_;
   bool dynamic_reconfig_initialized_{};
   bool track_target_{};
   double output_yaw_{}, output_pitch_{};

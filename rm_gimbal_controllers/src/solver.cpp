@@ -30,6 +30,11 @@ BulletSolver::BulletSolver(ros::NodeHandle& controller_nh)
               .track_move_target_delay = getParam(controller_nh, "track_move_target_delay", 0.),
               .min_fit_switch_count = getParam(controller_nh, "min_fit_switch_count", 3) };
   config_rt_buffer_.initRT(config_);
+  XmlRpc::XmlRpcValue xml_rpc_value;
+  if (!controller_nh.getParam("gimbal_switch_duration", xml_rpc_value))
+    ROS_ERROR("Gimbal switch duration no defined (namespace: %s)", controller_nh.getNamespace().c_str());
+  else
+    gimbal_switch_duration_.init(xml_rpc_value);
 
   d_srv_ = new dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>(controller_nh);
   dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>::CallbackType cb =
@@ -182,11 +187,11 @@ void BulletSolver::judgeShootBeforehand(const ros::Time& time, double v_yaw)
   if (!track_target_)
     shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::JUDGE_BY_ERROR;
   else if (target_selector_->getSwitchArmorState() == READY_SWITCH &&
-           (ros::Time::now() - ready_switch_armor_time_).toSec() < config_.gimbal_switch_duration)
+           (ros::Time::now() - ready_switch_armor_time_).toSec() < gimbal_switch_duration_.output(v_yaw))
     shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::BAN_SHOOT;
-  else if ((ros::Time::now() - switch_armor_time_).toSec() < config_.gimbal_switch_duration - config_.delay)
+  else if ((ros::Time::now() - switch_armor_time_).toSec() < gimbal_switch_duration_.output(v_yaw) - config_.delay)
     shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::BAN_SHOOT;
-  else if (((ros::Time::now() - switch_armor_time_).toSec() < config_.gimbal_switch_duration))
+  else if (((ros::Time::now() - switch_armor_time_).toSec() < gimbal_switch_duration_.output(v_yaw)))
     shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::ALLOW_SHOOT;
   else
     shoot_beforehand_cmd = rm_msgs::ShootBeforehandCmd::JUDGE_BY_ERROR;
