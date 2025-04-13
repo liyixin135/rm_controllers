@@ -57,7 +57,7 @@ private:
   realtime_tools::RealtimeBuffer<Config> config_rt_buffer_;
   dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>* d_srv_{};
   Config config_{};
-  ros::Time switch_armor_time_{}, ready_switch_armor_time_{};
+  ros::Time switch_armor_time_{};
   bool dynamic_reconfig_initialized_{};
   bool track_target_{};
   double output_yaw_{}, output_pitch_{};
