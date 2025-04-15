@@ -21,8 +21,8 @@ struct Config
 {
   double resistance_coff_qd_10, resistance_coff_qd_15, resistance_coff_qd_16, resistance_coff_qd_18,
       resistance_coff_qd_30, g, delay, wait_next_armor_delay, wait_diagonal_armor_delay, dt, timeout,
-      ban_shoot_duration, gimbal_switch_duration, max_switch_angle, min_switch_angle, min_shoot_beforehand_vel,
-      max_chassis_angular_vel, max_track_target_vel, track_rotate_target_delay, track_move_target_delay;
+      ban_shoot_duration, max_switch_angle, min_switch_angle, min_shoot_beforehand_vel, max_chassis_angular_vel,
+      max_track_target_vel, track_rotate_target_delay, track_move_target_delay;
   int min_fit_switch_count;
 };
 class BulletSolver
