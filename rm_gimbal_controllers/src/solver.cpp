@@ -174,6 +174,7 @@ void BulletSolver::publishState()
   {
     state_pub_->msg_.fly_time = fly_time_;
     state_pub_->msg_.current_armor = target_armor_;
+    state_pub_->msg_.switch_armor_state = target_selector_->getSwitchArmorState();
     state_pub_->unlockAndPublish();
   }
 }
