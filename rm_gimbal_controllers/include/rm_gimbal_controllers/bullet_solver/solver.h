@@ -8,6 +8,7 @@
 #include <realtime_tools/realtime_buffer.h>
 #include <dynamic_reconfigure/server.h>
 #include <rm_common/ros_utilities.h>
+#include <rm_common/linear_interpolation.h>
 #include <rm_msgs/BulletSolverState.h>
 #include <rm_msgs/ShootBeforehandCmd.h>
 #include <rm_gimbal_controllers/BulletSolverConfig.h>
@@ -20,8 +21,8 @@ struct Config
 {
   double resistance_coff_qd_10, resistance_coff_qd_15, resistance_coff_qd_16, resistance_coff_qd_18,
       resistance_coff_qd_30, g, delay, wait_next_armor_delay, wait_diagonal_armor_delay, dt, timeout,
-      ban_shoot_duration, gimbal_switch_duration, max_switch_angle, min_switch_angle, min_shoot_beforehand_vel,
-      max_chassis_angular_vel, max_track_target_vel, track_rotate_target_delay, track_move_target_delay;
+      ban_shoot_duration, max_switch_angle, min_switch_angle, min_shoot_beforehand_vel, max_chassis_angular_vel,
+      max_track_target_vel, track_rotate_target_delay, track_move_target_delay;
   int min_fit_switch_count;
 };
 class BulletSolver
@@ -58,6 +59,7 @@ private:
   dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>* d_srv_{};
   Config config_{};
   ros::Time switch_armor_time_{};
+  rm_common::LinearInterp gimbal_switch_duration_;
   bool dynamic_reconfig_initialized_{};
   bool track_target_{};
   double output_yaw_{}, output_pitch_{};
