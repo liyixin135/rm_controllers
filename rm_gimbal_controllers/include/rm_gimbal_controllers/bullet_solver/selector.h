@@ -47,23 +47,24 @@ public:
     double output_pitch = std::atan2(pos_.z, std::sqrt(std::pow(pos_.x, 2) + std::pow(pos_.y, 2)));
     double rough_fly_time =
         (-std::log(1 - target_rho * resistance_coff_ / (bullet_speed_ * std::cos(output_pitch)))) / resistance_coff_;
-    double max_switch_angle = 50 / 180 * M_PI;
     double min_switch_angle = 0 / 180 * M_PI;
-    double switch_armor_angle = v_yaw_ < max_track_target_vel_ ?
-                                    (acos(r1_ / target_rho) - max_switch_angle +
-                                     (-acos(r1_ / target_rho) + (max_switch_angle + min_switch_angle)) *
-                                         std::abs(v_yaw_) / max_track_target_vel_) :
-                                    min_switch_angle;
+    double angle_distance = acos(r1_ / target_rho) - min_switch_angle;
+    double max_switch_angle = min_switch_angle + 0.3 * angle_distance;
+    double switch_armor_angle =
+        v_yaw_ < max_track_target_vel_ ?
+            (max_switch_angle + ((-max_switch_angle + min_switch_angle) * std::abs(v_yaw_) / max_track_target_vel_)) :
+            min_switch_angle;
     if (v_yaw_ < max_track_target_vel_)
     {
       if (((((yaw_ + v_yaw_ * rough_fly_time) > output_yaw + switch_armor_angle) && v_yaw_ > 0.) ||
            (((yaw_ + v_yaw_ * rough_fly_time) < output_yaw - switch_armor_angle) && v_yaw_ < 0.)) &&
           std::abs(v_yaw_) >= 1.0)
       {
+        double next_angle_distance = acos(r2_ / target_rho) - min_switch_angle;
+        double next_max_switch_angle = min_switch_angle + 0.3 * next_angle_distance;
         double next_switch_armor_angle = v_yaw_ < max_track_target_vel_ ?
-                                             (acos(r2_ / target_rho) - max_switch_angle +
-                                              (-acos(r2_ / target_rho) + (max_switch_angle + min_switch_angle)) *
-                                                  std::abs(v_yaw_) / max_track_target_vel_) :
+                                             (next_max_switch_angle + ((-next_max_switch_angle + min_switch_angle) *
+                                                                       std::abs(v_yaw_) / max_track_target_vel_)) :
                                              min_switch_angle;
         if (((((yaw_ - (M_PI * 2 / armors_num_) + v_yaw_ * rough_fly_time) > output_yaw + next_switch_armor_angle) &&
               v_yaw_ > 0.) ||
