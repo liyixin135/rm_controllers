@@ -49,7 +49,7 @@ public:
         (-std::log(1 - target_rho * resistance_coff_ / (bullet_speed_ * std::cos(output_pitch)))) / resistance_coff_;
     double min_switch_angle = 0 / 180 * M_PI;
     double angle_distance = acos(r1_ / target_rho) - min_switch_angle;
-    double max_switch_angle = min_switch_angle + 0.3 * angle_distance;
+    double max_switch_angle = min_switch_angle + 0.4 * angle_distance;
     double switch_armor_angle =
         v_yaw_ < max_track_target_vel_ ?
             (max_switch_angle + ((-max_switch_angle + min_switch_angle) * std::abs(v_yaw_) / max_track_target_vel_)) :
