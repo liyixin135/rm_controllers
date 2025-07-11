@@ -39,6 +39,7 @@
 
 #include <realtime_tools/realtime_publisher.h>
 #include <realtime_tools/realtime_buffer.h>
+#include <rm_common/filters/lp_filter.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <visualization_msgs/Marker.h>
 #include <rm_gimbal_controllers/BulletSolverConfig.h>
@@ -57,8 +58,8 @@ struct Config
 {
   double resistance_coff_qd_10, resistance_coff_qd_15, resistance_coff_qd_16, resistance_coff_qd_18,
       resistance_coff_qd_30, g, delay, wait_next_armor_delay, wait_diagonal_armor_delay, dt, timeout,
-      ban_shoot_duration, gimbal_switch_duration, max_switch_angle, min_switch_angle, min_shoot_beforehand_vel,
-      max_chassis_angular_vel, track_rotate_target_delay, track_move_target_delay;
+      ban_shoot_duration, gimbal_switch_duration, max_switch_angle, min_switch_angle, switch_armor_angle,
+      min_shoot_beforehand_vel, max_chassis_angular_vel, track_rotate_target_delay, track_move_target_delay;
   int min_fit_switch_count;
 };
 
@@ -94,11 +95,14 @@ private:
   std::shared_ptr<realtime_tools::RealtimePublisher<visualization_msgs::Marker>> path_real_pub_;
   std::shared_ptr<realtime_tools::RealtimePublisher<rm_msgs::ShootBeforehandCmd>> shoot_beforehand_cmd_pub_;
   std::shared_ptr<realtime_tools::RealtimePublisher<std_msgs::Float64>> fly_time_pub_;
+  std::shared_ptr<realtime_tools::RealtimePublisher<std_msgs::Float64>> yaw_lp_pub_;
+  std::shared_ptr<realtime_tools::RealtimePublisher<std_msgs::Float64>> selected_armor_pub_;
   ros::Subscriber identified_target_change_sub_;
   ros::Time switch_armor_time_{};
   realtime_tools::RealtimeBuffer<Config> config_rt_buffer_;
   dynamic_reconfigure::Server<rm_gimbal_controllers::BulletSolverConfig>* d_srv_{};
   Config config_{};
+  LowPassFilter* lp_filter_;
   double max_track_target_vel_;
   double output_yaw_{}, output_pitch_{};
   double bullet_speed_{}, resistance_coff_{};
@@ -107,9 +111,14 @@ private:
   int shoot_beforehand_cmd_{};
   int selected_armor_;
   int count_;
+  double filter_alpha = 0.1;
+  double output_yaw_lp_{};
   bool track_target_ = true;
+  std::deque<double> yaw_buffer_;
+  std::size_t yaw_filter_window_size_ = 100;
   bool identified_target_change_ = true;
   bool is_in_delay_before_switch_{};
+  bool is_switched_;
   bool dynamic_reconfig_initialized_{};
 
   geometry_msgs::Point target_pos_{};
